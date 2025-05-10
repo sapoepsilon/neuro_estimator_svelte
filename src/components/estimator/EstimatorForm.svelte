@@ -6,25 +6,23 @@
   import { writable } from "svelte/store";
   import { createDefaultResponseStructure } from "$lib/types/estimateTypes";
   import { RevoGrid, type ColumnRegular } from '@revolist/svelte-datagrid';
+  import { user } from '../../stores/authStore';
+  import { supabase } from '$lib/supabase';
 
-  // Form state
   let loading = false;
   let result = null;
   let error = null;
-  let responseStructureJson = ""; // For the textarea
+  let responseStructureJson = "";
   
-  // Grid data
   let gridSource = [];
   let gridColumns = [];
 
-  // Form data
   const formData = writable({
     projectDetails: {
       title: "",
       description: "",
       scope: "",
-      timeline: ""
-    },
+      timeline: ""    },
     additionalRequirements: {
       feature1: "",
       feature2: ""
@@ -48,10 +46,8 @@
     }
   }
 
-  // Initialize the JSON string
   updateResponseStructureJson();
 
-  // Handle form submission
   async function handleSubmit() {
     loading = true;
     error = null;
@@ -65,10 +61,20 @@
         return;
       }
 
+      // Get the current session for the JWT token
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      // Check if user is authenticated
+      if (!$user || !session) {
+        throw new Error('Authentication required. Please log in to generate an estimate.');
+      }
+      
+      console.log(`Bearer ${session.access_token}`)
       const response = await fetch('http://localhost:3000/api/agent', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify($formData)
       });
@@ -79,7 +85,6 @@
 
       result = await response.json();
       
-      // Process result for grid display if it has the expected structure
       if (result && result.estimate && result.estimate.lineItems) {
         prepareGridData(result);
       }
