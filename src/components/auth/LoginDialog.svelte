@@ -1,0 +1,112 @@
+<script lang="ts">
+  import { Button } from "$lib/components/ui/button";
+  import { Input } from "$lib/components/ui/input";
+  import { Label } from "$lib/components/ui/label";
+  import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "$lib/components/ui/dialog";
+  import { signInWithEmail, signUpWithEmail } from "../../stores/authStore";
+  import { writable } from "svelte/store";
+
+  // Props
+  export let open = false;
+  export let onOpenChange = (value: boolean) => {};
+
+  // State
+  let isLogin = true;
+  let email = "";
+  let password = "";
+  let loading = false;
+  let error = "";
+
+  // Reset form on open
+  $: if (open) {
+    email = "";
+    password = "";
+    error = "";
+    loading = false;
+  }
+
+  // Toggle between login and signup
+  function toggleAuthMode() {
+    isLogin = !isLogin;
+    error = "";
+  }
+
+  // Handle form submission
+  async function handleSubmit() {
+    if (!email || !password) {
+      error = "Please fill in all fields";
+      return;
+    }
+
+    loading = true;
+    error = "";
+
+    try {
+      if (isLogin) {
+        await signInWithEmail(email, password);
+      } else {
+        await signUpWithEmail(email, password);
+      }
+      onOpenChange(false);
+    } catch (err) {
+      console.error("Auth error:", err);
+      error = err.message || "Authentication failed";
+    } finally {
+      loading = false;
+    }
+  }
+</script>
+
+<Dialog {open} onOpenChange={onOpenChange}>
+  <DialogContent class="sm:max-w-[425px]">
+    <DialogHeader>
+      <DialogTitle>{isLogin ? "Login" : "Sign Up"}</DialogTitle>
+      <DialogDescription>
+        {isLogin
+          ? "Enter your credentials to access your account."
+          : "Create a new account to get started."}
+      </DialogDescription>
+    </DialogHeader>
+    <form on:submit|preventDefault={handleSubmit} class="space-y-4 py-4">
+      <div class="space-y-2">
+        <Label for="email">Email</Label>
+        <Input
+          id="email"
+          type="email"
+          placeholder="your.email@example.com"
+          bind:value={email}
+          required
+        />
+      </div>
+      <div class="space-y-2">
+        <Label for="password">Password</Label>
+        <Input
+          id="password"
+          type="password"
+          placeholder="••••••••"
+          bind:value={password}
+          required
+        />
+      </div>
+
+      {#if error}
+        <div class="text-sm text-red-500">{error}</div>
+      {/if}
+
+      <DialogFooter class="flex flex-col sm:flex-row gap-2 sm:gap-0">
+        <Button
+          type="button"
+          variant="ghost"
+          on:click={toggleAuthMode}
+          class="mt-2 sm:mt-0"
+          disabled={loading}
+        >
+          {isLogin ? "Need an account? Sign up" : "Already have an account? Login"}
+        </Button>
+        <Button type="submit" disabled={loading}>
+          {loading ? "Processing..." : isLogin ? "Login" : "Sign Up"}
+        </Button>
+      </DialogFooter>
+    </form>
+  </DialogContent>
+</Dialog>
