@@ -1,10 +1,11 @@
 <script lang="ts">
   import "./app.css";
-  import EstimatorForm from './components/estimator/EstimatorForm.svelte';
   import Navbar from './components/Navbar.svelte';
   import LoginDialog from './components/auth/LoginDialog.svelte';
   import { onMount } from 'svelte';
   import { initializeAuthStore } from './stores/authStore';
+  import Router from 'svelte-spa-router';
+  import routes from './routes';
   
   // State for login dialog
   let loginDialogOpen = false;
@@ -27,10 +28,8 @@
 
 <Navbar openLoginDialog={openLoginDialog} />
 
-<main class="min-h-screen bg-slate-50">
-  <div class="container mx-auto py-8">
-    <EstimatorForm />
-  </div>
+<main class="min-h-screen  bg-slate-50">
+  <Router {routes} />
 </main>
 
 <LoginDialog 
