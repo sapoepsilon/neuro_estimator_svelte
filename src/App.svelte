@@ -49,7 +49,7 @@
       </button>
       <Navbar openLoginDialog={openLoginDialog} />
     </div>
-    <main class="flex-1 overflow-auto bg-slate-50">
+    <main class="flex-1">
       <Router {routes} />
     </main>
   </div>

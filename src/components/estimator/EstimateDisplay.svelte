@@ -1,9 +1,11 @@
 <script lang="ts">
   import { RevoGrid, type ColumnRegular } from '@revolist/svelte-datagrid';
-  import { Button } from "$lib/components/ui/button";
 
   export let result = null;
   export let onReset = () => {};
+  
+  // Get the container height for the grid
+  let containerHeight = 'auto';
   
   let gridSource = [];
   let gridColumns = [];
@@ -86,25 +88,23 @@
         </div>
       </div>
     </div>
-    
-    <div class="h-full w-full">
-      <RevoGrid 
-        source={gridSource} 
-        columns={gridColumns}
-        theme="material"
-        resize={true}
-        autoSizeColumn={true}
-        exporting={true}
-        stretch={true}
-        rowClass={(row) => {
-          if (row.isHeader) return 'font-semibold bg-slate-100';
-          if (row.isSubItem) return 'text-sm text-slate-600';
-          if (row.isTotal) return 'font-bold text-lg border-t-2';
-          return '';
-        }}
-        style="width: 100%; height: 100%;"
-      />
-    </div>
+  </div>
+  <div class="grid-container">
+    <RevoGrid 
+      source={gridSource} 
+      columns={gridColumns}
+      theme="material"
+      resize={true}
+      autoSizeColumn={true}
+      exporting={true}
+      stretch={true}
+      rowClass={(row) => {
+        if (row.isHeader) return 'font-semibold bg-slate-100';
+        if (row.isSubItem) return 'text-sm text-slate-600';
+        if (row.isTotal) return 'font-bold text-lg border-t-2';
+        return '';
+      }}
+    />
   </div>
 {:else}
   <div class="bg-slate-50 p-4 rounded-md">
@@ -112,4 +112,27 @@
   </div>
 {/if}
 
-<Button class="mt-4" on:click={onReset}>Create New Estimate</Button>
+<style>
+  /* Make the grid container take up all available space */
+  .grid-container {
+    height: calc(100vh - 300px); /* Adjust this value based on your layout */
+    min-height: 400px;
+    width: 100%;
+    position: relative;
+  }
+  
+  /* Override RevoGrid's default height settings */
+  :global(.grid-container revo-grid) {
+    height: 100% !important;
+    min-height: 100% !important;
+    width: 100% !important;
+  }
+  
+  :global(.grid-container .rgViewport) {
+    height: 100% !important;
+  }
+  
+  :global(.grid-container .main-viewport) {
+    height: 100% !important;
+  }
+</style>
