@@ -87,7 +87,7 @@
       </div>
     </div>
     
-    <div class="h-[400px] w-full">
+    <div class="h-full w-full">
       <RevoGrid 
         source={gridSource} 
         columns={gridColumns}

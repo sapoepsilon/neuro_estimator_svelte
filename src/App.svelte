@@ -6,6 +6,7 @@
   import { initializeAuthStore } from './stores/authStore';
   import Router from 'svelte-spa-router';
   import routes from './routes';
+  import AppSidebar from "$lib/components/app-sidebar.svelte";
   
   // State for login dialog
   let loginDialogOpen = false;
@@ -26,11 +27,15 @@
   });
 </script>
 
-<Navbar openLoginDialog={openLoginDialog} />
-
-<main class="min-h-screen  bg-slate-50">
-  <Router {routes} />
-</main>
+<div class="flex h-screen w-full overflow-hidden">
+  <AppSidebar />
+  <div class="flex-1 flex flex-col overflow-hidden">
+    <Navbar openLoginDialog={openLoginDialog} />
+    <main class="flex-1 overflow-auto bg-slate-50">
+      <Router {routes} />
+    </main>
+  </div>
+</div>
 
 <LoginDialog 
   open={loginDialogOpen} 
