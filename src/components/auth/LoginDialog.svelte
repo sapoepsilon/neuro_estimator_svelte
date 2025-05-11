@@ -4,20 +4,16 @@
   import { Label } from "$lib/components/ui/label";
   import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "$lib/components/ui/dialog";
   import { signInWithEmail, signUpWithEmail } from "../../stores/authStore";
-  import { writable } from "svelte/store";
 
-  // Props
   export let open = false;
   export let onOpenChange = (value: boolean) => {};
 
-  // State
   let isLogin = true;
   let email = "";
   let password = "";
   let loading = false;
   let error = "";
 
-  // Reset form on open
   $: if (open) {
     email = "";
     password = "";
@@ -25,13 +21,11 @@
     loading = false;
   }
 
-  // Toggle between login and signup
   function toggleAuthMode() {
     isLogin = !isLogin;
     error = "";
   }
 
-  // Handle form submission
   async function handleSubmit() {
     if (!email || !password) {
       error = "Please fill in all fields";
@@ -76,6 +70,7 @@
           placeholder="your.email@example.com"
           bind:value={email}
           required
+          class=""
         />
       </div>
       <div class="space-y-2">
@@ -86,6 +81,7 @@
           placeholder="••••••••"
           bind:value={password}
           required
+          class=""
         />
       </div>
 
@@ -103,7 +99,7 @@
         >
           {isLogin ? "Need an account? Sign up" : "Already have an account? Login"}
         </Button>
-        <Button type="submit" disabled={loading}>
+        <Button type="submit" disabled={loading} class="mt-2 sm:mt-0">
           {loading ? "Processing..." : isLogin ? "Login" : "Sign Up"}
         </Button>
       </DialogFooter>

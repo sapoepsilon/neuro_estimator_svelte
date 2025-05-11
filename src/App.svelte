@@ -7,6 +7,15 @@
   import Router from 'svelte-spa-router';
   import routes from './routes';
   import AppSidebar from "$lib/components/app-sidebar.svelte";
+  import { Menu } from "lucide-svelte";
+  
+  // Mobile sidebar state
+  let showMobileSidebar = false;
+  
+  // Toggle mobile sidebar
+  function toggleMobileSidebar() {
+    showMobileSidebar = !showMobileSidebar;
+  }
   
   // State for login dialog
   let loginDialogOpen = false;
@@ -28,9 +37,18 @@
 </script>
 
 <div class="flex h-screen w-full overflow-hidden">
-  <AppSidebar />
-  <div class="flex-1 flex flex-col overflow-hidden">
-    <Navbar openLoginDialog={openLoginDialog} />
+  <AppSidebar bind:sidebarVisible={showMobileSidebar} {openLoginDialog} />
+  <div class="flex-1 flex flex-col overflow-hidden relative">
+    <div class="flex items-center">
+      <button 
+        class="md:hidden p-2 m-2 rounded-md hover:bg-slate-100" 
+        on:click={toggleMobileSidebar}
+        aria-label="Toggle sidebar"
+      >
+        <Menu class="h-6 w-6" />
+      </button>
+      <Navbar openLoginDialog={openLoginDialog} />
+    </div>
     <main class="flex-1 overflow-auto bg-slate-50">
       <Router {routes} />
     </main>

@@ -1,13 +1,6 @@
 <script lang="ts">
-  import { Button } from "$lib/components/ui/button";
-  import { user, signOut } from "../stores/authStore";;
-  
-  // Props
+  import { user, signOut } from "../stores/authStore";
   export let openLoginDialog = () => {};
-  
-  function createNewProject() {
-    window.location.hash = '/estimator';
-  }
 </script>
 
 <div class="border-b w-full">
@@ -21,19 +14,15 @@
     <div class="flex flex-1 items-center justify-end space-x-4">
       <nav class="flex items-center space-x-2">
         {#if $user}
-          <Button variant="default" size="sm" on:click={createNewProject}>
-            Create a new project
-          </Button>
-         
-          <div class="flex items-center space-x-2 ml-4">
-            <Button variant="outline" size="sm" on:click={signOut}>
+          <div class="items-center space-x-2 ml-4 hidden md:flex">
+            <button on:click={signOut} class="hidden md:inline-flex">
               Sign Out
-            </Button>
+            </button>
           </div>
         {:else}
-          <Button variant="outline" size="sm" on:click={openLoginDialog}>
+          <button on:click={openLoginDialog} class="hidden md:inline-flex">
             Login / Sign Up
-          </Button>
+          </button>
         {/if}
       </nav>
     </div>
