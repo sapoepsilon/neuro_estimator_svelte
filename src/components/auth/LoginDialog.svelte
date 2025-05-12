@@ -94,10 +94,12 @@
           type="button"
           variant="ghost"
           on:click={toggleAuthMode}
-          class="mt-2 sm:mt-0"
+          class="mt-2 sm:mt-0 w-full sm:w-auto px-4 py-2 text-center"
           disabled={loading}
         >
-          {isLogin ? "Need an account? Sign up" : "Already have an account? Login"}
+          <span class="w-full text-center">
+            {isLogin ? "Need an account? Sign up" : "Already have an account? Login"}
+          </span>
         </Button>
         <Button type="submit" disabled={loading} class="mt-2 sm:mt-0">
           {loading ? "Processing..." : isLogin ? "Login" : "Sign Up"}

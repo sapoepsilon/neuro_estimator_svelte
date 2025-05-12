@@ -2,6 +2,7 @@
   import "./app.css";
   import Navbar from './components/Navbar.svelte';
   import LoginDialog from './components/auth/LoginDialog.svelte';
+  import WelcomeDialog from './components/WelcomeDialog.svelte';
   import { onMount } from 'svelte';
   import { initializeAuthStore } from './stores/authStore';
   import Router from 'svelte-spa-router';
@@ -41,6 +42,9 @@ import AiSidebar from "$lib/components/ai-sidebar.svelte";
   // State for login dialog
   let loginDialogOpen = false;
   
+  // State for welcome dialog
+  let welcomeDialogOpen = false;
+  
   // Function to open login dialog
   function openLoginDialog() {
     loginDialogOpen = true;
@@ -49,6 +53,11 @@ import AiSidebar from "$lib/components/ai-sidebar.svelte";
   // Function to handle dialog open state change
   function handleLoginDialogOpenChange(open: boolean) {
     loginDialogOpen = open;
+  }
+  
+  // Function to handle welcome dialog open state change
+  function handleWelcomeDialogOpenChange(open: boolean) {
+    welcomeDialogOpen = open;
   }
   
   // Function to handle project selection
@@ -135,6 +144,11 @@ import AiSidebar from "$lib/components/ai-sidebar.svelte";
 <LoginDialog 
   open={loginDialogOpen} 
   onOpenChange={handleLoginDialogOpenChange} 
+/>
+
+<WelcomeDialog
+  bind:open={welcomeDialogOpen}
+  onOpenChange={handleWelcomeDialogOpenChange}
 />
 
 <style>

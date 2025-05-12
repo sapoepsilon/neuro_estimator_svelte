@@ -65,7 +65,6 @@
   };
   
   onMount(() => {
-    // Check for latest project and redirect if found
     redirectToLatestProject();
   });
 </script>
