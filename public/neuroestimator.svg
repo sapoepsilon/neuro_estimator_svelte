@@ -1,0 +1,18 @@
+<svg width="150" height="172.5" viewBox="0 0 100 115" xmlns="http://www.w3.org/2000/svg" font-family="Inter, Helvetica, Arial, sans-serif">
+  <title>NeuroEstimator Logo</title>
+  <desc>An abstract representation of a neural network with a central estimator node.</desc>
+
+  <g id="logo-graphic">
+    <circle cx="50" cy="45" r="10" fill="#1ABC9C" aria-label="Estimator Node"/>
+    <circle cx="50" cy="45" r="7" fill="none" stroke="#FFFFFF" stroke-width="1"/>
+    <circle cx="50" cy="45" r="3" fill="#FFFFFF"/>
+
+    <circle cx="25" cy="30" r="7" fill="#2C3E50" aria-label="Neural Node 1"/>
+    <circle cx="75" cy="35" r="6" fill="#2C3E50" aria-label="Neural Node 2"/>
+    <circle cx="60" cy="75" r="8" fill="#2C3E50" aria-label="Neural Node 3"/>
+
+    <path d="M 50,45 C 40,40 30,35 25,30" stroke="#2C3E50" stroke-width="2.5" fill="none" aria-label="Neural Pathway 1"/>
+    <path d="M 50,45 C 60,40 70,38 75,35" stroke="#2C3E50" stroke-width="2.5" fill="none" aria-label="Neural Pathway 2"/>
+    <path d="M 50,45 C 52,60 55,70 60,75" stroke="#2C3E50" stroke-width="2.5" fill="none" aria-label="Neural Pathway 3"/>
+  </g>
+</svg>

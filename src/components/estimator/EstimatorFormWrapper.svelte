@@ -188,6 +188,18 @@
     loading = false;
     error = null;
   }
+  
+  // Handle when a new item is added via EstimateDisplay
+  async function handleItemAdded() {
+    // Refresh the estimate items data
+    await fetchEstimateItems();
+  }
+  
+  // Handle when an item is deleted via EstimateDisplay
+  async function handleItemDeleted() {
+    // Refresh the estimate items data
+    await fetchEstimateItems();
+  }
 
   onMount(() => {
     projectId = parseUrlParams();
@@ -230,7 +242,9 @@
     <div class="relative">
       <EstimateDisplay 
         result={formatEstimateItemsForDisplay()} 
-        onReset={resetEstimate} 
+        onReset={resetEstimate}
+        on:itemAdded={handleItemAdded}
+        on:itemDeleted={handleItemDeleted}
       />
       
       <!-- AI Estimator Toggle Button -->
