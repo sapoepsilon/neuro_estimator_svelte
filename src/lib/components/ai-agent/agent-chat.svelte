@@ -255,7 +255,7 @@
       
       const assistantResponse: MessageBase = {
         role: 'assistant' as const,
-        content: data.response || 'No response from AI agent.'
+        content: data.response || 'Completed'
       };
       
       messages = [...messages, assistantResponse];

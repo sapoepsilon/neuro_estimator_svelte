@@ -218,44 +218,21 @@
       saveLoading = false;
     }
   }
-  
-
-
-  // Reset form
-  function resetForm() {
-    $formData = {
-      projectDetails: {
-        title: "",
-        description: "",
-        scope: "",
-        timeline: ""
-      },
-      additionalRequirements: {
-        feature1: "",
-        feature2: ""
-      },
-      responseStructure: createDefaultResponseStructure()
-    };
-    updateResponseStructureJson();
-    result = null;
-    error = null;
-  }
 </script>
 
-<div class="container mx-auto py-8 px-4 max-w-full">
-  <Card class="w-full max-w-3xl mx-auto">
+<div class="container mx-auto py-8 px-4 max-w-full overflow-auto" style="max-height: 90vh;">
+  <Card class="w-full max-w-3xl mx-auto overflow-auto">
     <CardHeader>
       <CardTitle class="text-2xl font-bold">Project Estimator</CardTitle>
       <CardDescription>Fill in the details to generate a project estimate</CardDescription>
     </CardHeader>
-    <CardContent>
+    <CardContent class="overflow-y-auto">
       {#if result}
         <div class="mb-6">
           <h3 class="text-xl font-semibold mb-4">Estimate Result: {result.estimate?.title || 'Project Estimate'}</h3>
           
           <EstimateDisplay 
             {result} 
-            onReset={resetForm} 
           />
         </div>
       {:else}

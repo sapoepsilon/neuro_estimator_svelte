@@ -393,18 +393,21 @@
         <div class="text-right">
           <p class="text-lg font-semibold">{result.estimate?.totalAmount || 0} {result.estimate?.currency || 'USD'}</p>
         </div>
-      </div>
-      <div class="mt-4 flex justify-end">
+         <div class="mt-4 flex justify-end">
         <button 
           on:click={toggleNewItemForm} 
           class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm flex items-center"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-          </svg>
+          {#if !showNewItemForm}
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+          {/if}
           {showNewItemForm ? 'Cancel' : 'Add New Item'}
         </button>
       </div>
+      </div>
+     
       
       {#if showNewItemForm}
         <div class="mt-4 p-4 bg-slate-100 rounded-md">

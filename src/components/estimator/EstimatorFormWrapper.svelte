@@ -161,8 +161,12 @@
     }
   }
   
+  // Track AI sidebar visibility
+  let isAiSidebarVisible = false;
+
   // Function to toggle AI sidebar
   function toggleAiSidebar() {
+    isAiSidebarVisible = !isAiSidebarVisible;
     // Dispatch a custom event to toggle the AI sidebar
     window.dispatchEvent(new CustomEvent('toggleAiSidebar', { 
       detail: { 
@@ -171,6 +175,19 @@
       }
     }));
   }
+  
+  // Listen for external sidebar close events
+  onMount(() => {
+    const handleSidebarClose = () => {
+      isAiSidebarVisible = false;
+    };
+    
+    window.addEventListener('aiSidebarClosed', handleSidebarClose);
+    
+    return () => {
+      window.removeEventListener('aiSidebarClosed', handleSidebarClose);
+    };
+  });
   
   // Handle keyboard shortcut (Ctrl+Space)
   function handleKeydown(event) {
@@ -242,25 +259,27 @@
     <div class="relative">
       <EstimateDisplay 
         result={formatEstimateItemsForDisplay()} 
-        onReset={resetEstimate}
         on:itemAdded={handleItemAdded}
         on:itemDeleted={handleItemDeleted}
       />
       
       <!-- AI Estimator Toggle Button -->
-      <div class="fixed bottom-6 right-6 flex flex-col items-end space-y-2">
+      {#if !isAiSidebarVisible}
+      <div class="fixed bottom-6 right-6 flex flex-col items-end space-y-2 z-[999]" style="pointer-events: auto;">
         <div class="bg-white dark:bg-gray-800 text-xs text-gray-500 dark:text-gray-400 p-2 rounded-md shadow-md flex items-center mb-2">
           <Keyboard class="h-3 w-3 mr-1" />
           <span>Ctrl+K</span>
         </div>
         <button
-          class="bg-primary text-white p-3 rounded-full shadow-lg hover:bg-primary/90 transition-colors"
+          class="bg-primary text-white p-3 rounded-full shadow-lg hover:bg-primary/90 transition-colors z-[100] cursor-pointer"
           on:click={toggleAiSidebar}
           aria-label="Toggle AI Estimator"
+          style="pointer-events: auto;"
         >
           <MessageSquare class="h-6 w-6" />
         </button>
       </div>
+      {/if}
     </div>
   {:else}
     <div class="relative">
@@ -268,19 +287,22 @@
       
       <!-- AI Estimator Toggle Button -->
       {#if projectId}
-        <div class="fixed bottom-6 right-6 flex flex-col items-end space-y-2">
+        {#if !isAiSidebarVisible}
+        <div class="fixed bottom-6 right-6 flex flex-col items-end space-y-2 z-[999]" style="pointer-events: auto;">
           <div class="bg-white dark:bg-gray-800 text-xs text-gray-500 dark:text-gray-400 p-2 rounded-md shadow-md flex items-center mb-2">
             <Keyboard class="h-3 w-3 mr-1" />
-            <span>Ctrl+Space</span>
+            <span>Ctrl+K</span>
           </div>
           <button
-            class="bg-primary text-white p-3 rounded-full shadow-lg hover:bg-primary/90 transition-colors"
+            class="bg-primary text-white p-3 rounded-full shadow-lg hover:bg-primary/90 transition-colors z-[100] cursor-pointer"
             on:click={toggleAiSidebar}
             aria-label="Toggle AI Estimator"
+            style="pointer-events: auto;"
           >
             <MessageSquare class="h-6 w-6" />
           </button>
         </div>
+        {/if}
       {/if}
     </div>
   {/if}
