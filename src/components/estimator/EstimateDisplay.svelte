@@ -4,9 +4,6 @@
   export let result = null;
   export let onReset = () => {};
   
-  // Get the container height for the grid
-  let containerHeight = 'auto';
-  
   let gridSource = [];
   let gridColumns = [];
   
@@ -14,15 +11,12 @@
     prepareGridData(result);
   }
   
-  // Prepare data for RevoGrid
   function prepareGridData(data) {
-    // Reset grid data
     gridSource = [];
     gridColumns = [];
     
     if (!data.estimate || !data.estimate.lineItems) return;
     
-    // Create columns
     gridColumns = [
       { prop: 'description', name: 'Description', size: 250, minSize: 200, maxSize: 500 },
       { prop: 'quantity', name: 'Quantity', size: 100, minSize: 80, maxSize: 150 },
@@ -31,12 +25,9 @@
       { prop: 'amount', name: 'Amount', size: 120, minSize: 100, maxSize: 200 }
     ];
     
-    // Process line items for the grid
     const flattenedItems = [];
     
-    // Add the main line items
     data.estimate.lineItems.forEach((item, index) => {
-      // Add the main item
       flattenedItems.push({
         id: `item-${index}`,
         description: item.description,
@@ -47,12 +38,11 @@
         isHeader: true
       });
       
-      // Add sub-items if they exist
       if (item.subItems && item.subItems.length > 0) {
         item.subItems.forEach((subItem, subIndex) => {
           flattenedItems.push({
             id: `item-${index}-sub-${subIndex}`,
-            description: `    ${subItem.description}`,  // Indent sub-items
+            description: `    ${subItem.description}`,
             quantity: subItem.quantity,
             unitType: subItem.unitType,
             unitPrice: subItem.unitPrice,
@@ -63,7 +53,6 @@
       }
     });
     
-    // Add total row
     flattenedItems.push({
       id: 'total',
       description: 'Total',

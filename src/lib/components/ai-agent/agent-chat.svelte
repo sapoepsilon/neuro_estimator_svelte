@@ -1,16 +1,19 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ArrowLeft, Send } from 'lucide-svelte';
+  import { Send, Loader2 } from 'lucide-svelte';
+  import { supabase } from "$lib/supabase";
+  import { user } from "../../../stores/authStore";
+  import { API_AGENT_PROMPT_URL } from '../ui/sidebar/constants';
   
-  // Props
-  export let onBackToRegularMode = () => {};
   export let projectId: string | null = null;
   export let projectName: string | null = null;
+  export let conversationId: string | null = null;
   
-  // Define message types
   type MessageBase = {
-    role: 'user' | 'system';
+    id?: string;
+    role: 'user' | 'system' | 'assistant';
     content: string;
+    created_at?: string;
   }
   
   type LoadingMessage = MessageBase & {
@@ -24,30 +27,131 @@
   type Message = MessageBase | LoadingMessage | ErrorMessage;
   
   // Chat state
-  let messages: Message[] = [
-    {
-      role: 'system',
-      content: projectName 
-        ? `Welcome to the Neuro Estimator AI Agent for project "${projectName}". How can I help you with your estimation?`
-        : 'Welcome to the Neuro Estimator AI Agent. How can I help you with your estimation?'
-    }
-  ];
+  let messages: Message[] = [];
+  let internalConversationId: string | null = conversationId;
+  let isLoading = true;
+  let loadError: string | null = null;
   
   let newMessage = '';
   let chatContainer: HTMLElement;
   
+  // Function to load conversation history for the current project
+  async function loadConversationHistory() {
+    if ((!projectId && !internalConversationId) || !$user) {
+      isLoading = false;
+      return;
+    }
+    
+    try {
+      isLoading = true;
+      loadError = null;
+      
+      // Use the provided conversationId if available, otherwise find the latest one
+      if (!internalConversationId && projectId) {
+        const { data: conversationData, error: conversationError } = await supabase
+          .from('conversations')
+          .select('id')
+          .eq('project_id', projectId)
+          .order('created_at', { ascending: false })
+          .limit(1);
+        
+        if (conversationError) {
+          throw conversationError;
+        }
+        
+        if (conversationData && conversationData.length > 0) {
+          // Existing conversation found
+          internalConversationId = conversationData[0].id;
+        }
+      }
+        
+      // Load messages if we have a conversation ID
+      if (internalConversationId) {
+        // Load messages for this conversation
+        const { data: messagesData, error: messagesError } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('conversation_id', internalConversationId)
+          .order('created_at', { ascending: true });
+        
+        if (messagesError) {
+          throw messagesError;
+        }
+        
+        if (messagesData && messagesData.length > 0) {
+          // Process messages - we need to parse content if it's JSON
+          messages = messagesData.map(msg => {
+            let processedContent = msg.content;
+            
+            // Try to parse content if it's JSON
+            if (typeof msg.content === 'string' && (msg.content.startsWith('{') || msg.content.startsWith('['))) {
+              try {
+                const contentObj = JSON.parse(msg.content);
+                // If it has a raw_response field, use that text
+                if (contentObj.raw_response && contentObj.raw_response.text) {
+                  processedContent = contentObj.raw_response.text;
+                }
+              } catch (e) {
+                // If parsing fails, use the original content
+                console.log('Failed to parse message content as JSON:', e);
+              }
+            }
+            
+            return {
+              id: msg.id,
+              role: msg.role,
+              content: processedContent,
+              created_at: msg.created_at
+            };
+          });
+        }
+      } else {
+        // No existing conversation, create a welcome message
+        messages = [
+          {
+            role: 'assistant' as const,
+            content: projectName 
+              ? `Welcome to the Neuro Estimator AI Agent for project "${projectName}". How can I help you with your estimation?`
+              : 'Welcome to the Neuro Estimator AI Agent. How can I help you with your estimation?'
+          }
+        ];
+      }
+    } catch (error) {
+      console.error('Error loading conversation history:', error);
+      loadError = 'Failed to load conversation history. Please try again.';
+      messages = [
+        {
+          role: 'system',
+          content: 'Failed to load conversation history. Please try again.',
+          error: true
+        } as ErrorMessage
+      ];
+    } finally {
+      isLoading = false;
+      
+      // Scroll to bottom after loading messages
+      setTimeout(() => {
+        if (chatContainer) {
+          chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+      }, 100);
+    }
+  }
+  
   // Function to send message to AI agent
   async function sendMessage() {
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() || !$user) return;
     
     // Add user message to chat
-    messages = [...messages, {
-      role: 'user',
+    const userMessage: MessageBase = {
+      role: 'user' as const,
       content: newMessage
-    }];
+    };
+    
+    messages = [...messages, userMessage];
     
     // Clear input
-    const userMessage = newMessage;
+    const messageContent = newMessage;
     newMessage = '';
     
     // Scroll to bottom
@@ -59,33 +163,121 @@
     
     // Add loading message
     messages = [...messages, {
-      role: 'system',
+      role: 'assistant',
       content: '...',
       loading: true
     } as LoadingMessage];
     
     try {
-      // In a real implementation, this would call your server
-      // For now, we'll simulate a response after a delay
-      setTimeout(() => {
-        // Replace loading message with AI response
-        messages = messages.filter(m => !('loading' in m));
+      // Create a conversation if we don't have one yet
+      if (!internalConversationId && projectId) {
+        const { data: newConversation, error: conversationError } = await supabase
+          .from('conversations')
+          .insert([
+            { 
+              project_id: projectId,
+              created_by: $user.id 
+            }
+          ])
+          .select();
+        
+        if (conversationError) {
+          throw conversationError;
+        }
+        
+        if (newConversation && newConversation.length > 0) {
+          internalConversationId = newConversation[0].id;
+        } else {
+          throw new Error('Failed to create conversation');
+        }
+      }
+      
+      if (internalConversationId) {
+        const { error: messageError } = await supabase
+          .from('messages')
+          .insert([
+            {
+              conversation_id: internalConversationId,
+              content: messageContent,
+              role: 'user',
+              user_id: $user.id
+            }
+          ]);
+        
+        if (messageError) {
+          throw messageError;
+        }
+      }
+      
+      messages = messages.filter(m => !('loading' in m));
+      
+      const estimateId = projectId;
+      
+      let response;
+      let data;
+      
+      let accessToken = '';
+      
+      if ($user) {
+        console.log('User from store:', $user);
+        const { data } = await supabase.auth.getSession();
+        accessToken = data.session?.access_token || '';
+      } else {
+        console.log('No user in store, getting session directly');
+        const { data } = await supabase.auth.getSession();
+        accessToken = data.session?.access_token || '';
+      }
+      
+      console.log(`Using access token: ${accessToken ? 'Token available' : 'No token'}`);
+      
+      try {
+        response = await fetch(API_AGENT_PROMPT_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`
+          },
+          body: JSON.stringify({
+            estimateId: estimateId,
+            projectId: projectId,
+            prompt: messageContent,
+            userId: $user?.id,
+            conversationId: internalConversationId
+          })
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`API responded with status: ${response.status}. Details: ${errorText}`);
+        }
+        
+        data = await response.json();
+      } catch (apiError) {
+        console.error('API call error details:', apiError);
         messages = [...messages, {
           role: 'system',
-          content: `This is a simulated response to: "${userMessage}". In a real implementation, this would come from your server. The project ID is ${projectId || 'not specified'}.`
-        }];
-        
-        // Scroll to bottom
-        setTimeout(() => {
-          if (chatContainer) {
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-          }
-        }, 100);
-      }, 1500);
+          content: `Error connecting to AI agent: ${apiError.message || 'Unknown error'}`,
+          error: true
+        } as ErrorMessage];
+        return;
+      }
+      
+      const assistantResponse: MessageBase = {
+        role: 'assistant' as const,
+        content: data.response || 'No response from AI agent.'
+      };
+      
+      messages = [...messages, assistantResponse];
+      
+      setTimeout(() => {
+        if (chatContainer) {
+          chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+      }, 100);
+      
     } catch (error) {
       console.error('Error sending message to AI agent:', error);
       
-      // Replace loading message with error
       messages = messages.filter(m => !('loading' in m));
       messages = [...messages, {
         role: 'system',
@@ -95,7 +287,6 @@
     }
   }
   
-  // Handle Enter key to send message
   function handleKeydown(event: KeyboardEvent) {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
@@ -103,53 +294,66 @@
     }
   }
   
-  // Scroll to bottom on mount
   onMount(() => {
-    if (chatContainer) {
-      chatContainer.scrollTop = chatContainer.scrollHeight;
-    }
+    loadConversationHistory();
   });
+  
+  $: if (conversationId !== internalConversationId) {
+    internalConversationId = conversationId;
+    loadConversationHistory();
+  }
 </script>
 
 <div class="h-full flex flex-col">
-  <!-- Header -->
-  <div class="p-4 border-b flex items-center">
-    <button 
-      class="p-1 mr-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800" 
-      on:click={onBackToRegularMode}
-      aria-label="Back to regular mode"
-    >
-      <ArrowLeft class="h-5 w-5" />
-    </button>
-    <h2 class="text-lg font-semibold">AI Estimating Agent</h2>
-  </div>
-  
-  <!-- Chat Container -->
   <div 
-    class="flex-1 overflow-auto p-4 space-y-4"
+    class="flex-1 overflow-auto p-4 space-y-4 relative"
     bind:this={chatContainer}
   >
-    {#each messages as message}
-      <div class="flex {message.role === 'user' ? 'justify-end' : 'justify-start'}">
-        <div 
-          class="max-w-[80%] p-3 rounded-lg {message.role === 'user' 
-            ? 'bg-primary text-primary-foreground' 
-            : 'error' in message && message.error 
-              ? 'bg-destructive text-destructive-foreground' 
-              : 'bg-muted'}"
-        >
-          {#if 'loading' in message && message.loading}
-            <div class="flex space-x-1">
-              <div class="w-2 h-2 rounded-full bg-current animate-bounce"></div>
-              <div class="w-2 h-2 rounded-full bg-current animate-bounce" style="animation-delay: 0.2s"></div>
-              <div class="w-2 h-2 rounded-full bg-current animate-bounce" style="animation-delay: 0.4s"></div>
-            </div>
-          {:else}
-            <p class="whitespace-pre-wrap break-words">{message.content}</p>
-          {/if}
+    {#if isLoading}
+      <div class="absolute inset-0 flex items-center justify-center bg-background/80">
+        <div class="flex flex-col items-center space-y-2">
+          <Loader2 class="h-8 w-8 animate-spin text-primary" />
+          <p class="text-sm text-muted-foreground">Loading conversation...</p>
         </div>
       </div>
-    {/each}
+    {:else if loadError}
+      <div class="flex justify-center">
+        <div class="max-w-[80%] p-3 rounded-lg bg-destructive text-destructive-foreground">
+          <p class="whitespace-pre-wrap break-words">{loadError}</p>
+        </div>
+      </div>
+    {:else if messages.length === 0}
+      <div class="flex justify-center">
+        <div class="max-w-[80%] p-3 rounded-lg bg-muted">
+          <p class="whitespace-pre-wrap break-words">No messages yet. Start a conversation!</p>
+        </div>
+      </div>
+    {:else}
+      {#each messages as message}
+        <div class="flex {message.role === 'user' ? 'justify-end' : 'justify-start'}">
+          <div 
+            class="max-w-[80%] p-3 rounded-lg {message.role === 'user' 
+              ? 'bg-primary text-primary-foreground' 
+              : 'error' in message && message.error 
+                ? 'bg-destructive text-destructive-foreground' 
+                : 'bg-muted'}"
+          >
+            {#if 'loading' in message && message.loading}
+              <div class="flex space-x-1">
+                <div class="w-2 h-2 rounded-full bg-current animate-bounce"></div>
+                <div class="w-2 h-2 rounded-full bg-current animate-bounce" style="animation-delay: 0.2s"></div>
+                <div class="w-2 h-2 rounded-full bg-current animate-bounce" style="animation-delay: 0.4s"></div>
+              </div>
+            {:else}
+              <p class="whitespace-pre-wrap break-words">{message.content}</p>
+              {#if message.created_at}
+                <div class="text-xs opacity-50 mt-1">{new Date(message.created_at).toLocaleTimeString()}</div>
+              {/if}
+            {/if}
+          </div>
+        </div>
+      {/each}
+    {/if}
   </div>
   
   <!-- Message Input -->

@@ -7,15 +7,36 @@
   import Router from 'svelte-spa-router';
   import routes from './routes';
   import AppSidebar from "$lib/components/app-sidebar.svelte";
+import AiSidebar from "$lib/components/ai-sidebar.svelte";
+
   import { Menu } from "lucide-svelte";
   
-  // Mobile sidebar state
+  // Sidebar states
+  
+  // Sidebar states
   let showMobileSidebar = false;
+  let showAiSidebar = false;
+  let aiSidebarProjectId = null;
+  let aiSidebarProjectName = null;
+  
+  // No localStorage persistence for AI sidebar
+  
+  // No reactive state persistence for AI sidebar
   
   // Toggle mobile sidebar
   function toggleMobileSidebar() {
     showMobileSidebar = !showMobileSidebar;
   }
+  
+  // Function to open AI sidebar
+  function openAiSidebar(project) {
+    aiSidebarProjectId = project.id;
+    aiSidebarProjectName = project.name;
+    showAiSidebar = true;
+  }
+  
+  // Reference to the AI sidebar component
+  let aiSidebarComponent;
   
   // State for login dialog
   let loginDialogOpen = false;
@@ -30,30 +51,86 @@
     loginDialogOpen = open;
   }
   
-  // Initialize auth store on mount
+  // Function to handle project selection
+  function handleProjectSelected(event) {
+    const projectId = event.detail.projectId;
+    // Get project details from the URL parameters
+    const urlParams = new URLSearchParams(window.location.hash.split('?')[1]);
+    const projectName = urlParams.get('name') || 'Project';
+    
+    // Open the AI sidebar with the selected project
+    aiSidebarProjectId = projectId;
+    aiSidebarProjectName = projectName;
+    showAiSidebar = true;
+  }
+  
+  // Function to handle AI sidebar toggle
+  function handleToggleAiSidebar(event) {
+    const { projectId, projectName } = event.detail;
+    
+    // Toggle the sidebar visibility
+    showAiSidebar = !showAiSidebar;
+    
+    // If opening, update the project details
+    if (showAiSidebar) {
+      aiSidebarProjectId = projectId;
+      aiSidebarProjectName = projectName;
+    }
+  }
+  
+  // Function to explicitly hide the AI sidebar
+  function handleHideAiSidebar() {
+    showAiSidebar = false;
+  }
+  
+  // Initialize auth store and set up event listeners on mount
   onMount(() => {
+    // Initialize auth store
     initializeAuthStore();
+    
+    // Listen for project selection events
+    window.addEventListener('projectSelected', handleProjectSelected);
+    
+    // Listen for AI sidebar toggle events
+    window.addEventListener('toggleAiSidebar', handleToggleAiSidebar);
+    
+    // Listen for hide AI sidebar events
+    window.addEventListener('hideAiSidebar', handleHideAiSidebar);
+    
+    return () => {
+      window.removeEventListener('projectSelected', handleProjectSelected);
+      window.removeEventListener('toggleAiSidebar', handleToggleAiSidebar);
+      window.removeEventListener('hideAiSidebar', handleHideAiSidebar);
+    };
   });
 </script>
 
-<div class="flex h-screen w-full overflow-hidden">
-  <AppSidebar bind:sidebarVisible={showMobileSidebar} {openLoginDialog} />
-  <div class="flex-1 flex flex-col overflow-hidden relative">
-    <div class="flex items-center">
-      <button 
-        class="md:hidden p-2 m-2 rounded-md hover:bg-slate-100" 
-        on:click={toggleMobileSidebar}
-        aria-label="Toggle sidebar"
-      >
-        <Menu class="h-6 w-6" />
-      </button>
-      <Navbar openLoginDialog={openLoginDialog} />
+
+  <div class="flex h-screen w-full overflow-hidden">
+    <AppSidebar bind:sidebarVisible={showMobileSidebar} {openLoginDialog} />
+    <div class="flex-1 flex flex-col overflow-hidden relative">
+      <div class="flex items-center">
+        <button 
+          class="md:hidden p-2 m-2 rounded-md hover:bg-slate-100" 
+          on:click={toggleMobileSidebar}
+          aria-label="Toggle sidebar"
+        >
+          <Menu class="h-6 w-6" />
+        </button>
+        <Navbar openLoginDialog={openLoginDialog} />
+      </div>
+      <main class="flex-1">
+        <Router {routes} />
+      </main>
     </div>
-    <main class="flex-1">
-      <Router {routes} />
-    </main>
+    <AiSidebar 
+      bind:open={showAiSidebar} 
+      bind:projectId={aiSidebarProjectId} 
+      bind:projectName={aiSidebarProjectName} 
+      bind:this={aiSidebarComponent}
+    />
   </div>
-</div>
+
 
 <LoginDialog 
   open={loginDialogOpen} 

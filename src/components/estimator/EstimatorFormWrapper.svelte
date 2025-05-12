@@ -4,6 +4,7 @@
   import { user } from '../../stores/authStore';
   import EstimatorForm from './EstimatorForm.svelte';
   import EstimateDisplay from './EstimateDisplay.svelte';
+  import { MessageSquare, Keyboard } from 'lucide-svelte';
   
   let projectId = null;
   let loading = true;
@@ -161,11 +162,43 @@
     }
   }
   
+  // Function to toggle AI sidebar
+  function toggleAiSidebar() {
+    // Dispatch a custom event to toggle the AI sidebar
+    window.dispatchEvent(new CustomEvent('toggleAiSidebar', { 
+      detail: { 
+        projectId: projectId,
+        projectName: project?.name || 'Project'
+      }
+    }));
+  }
+  
+  // Handle keyboard shortcut (Ctrl+Space)
+  function handleKeydown(event) {
+    if (event.ctrlKey && event.key === 'k') {
+      event.preventDefault();
+      toggleAiSidebar();
+    }
+  }
+  
+  // Handle new project creation event
+  function handleNewProject() {
+    console.log('New project event received');
+    // Reset state for a new project
+    projectId = null;
+    project = null;
+    estimateItems = [];
+    loading = false;
+    error = null;
+  }
+
   onMount(() => {
     projectId = parseUrlParams();
     
-    // Set up event listener for project selection
+    // Set up event listeners
     window.addEventListener('projectSelected', handleProjectSelected);
+    window.addEventListener('keydown', handleKeydown);
+    window.addEventListener('newProject', handleNewProject);
     
     if (!projectId) {
       loading = false;
@@ -178,9 +211,11 @@
       }, 2000); // Timeout as a fallback
     }
     
-    // Clean up event listener on component destruction
+    // Clean up event listeners on component destruction
     return () => {
       window.removeEventListener('projectSelected', handleProjectSelected);
+      window.removeEventListener('keydown', handleKeydown);
+      window.removeEventListener('newProject', handleNewProject);
     };
   });
 </script>
@@ -195,11 +230,47 @@
       <p>{error}</p>
     </div>
   {:else if projectId && estimateItems.length > 0}
-    <EstimateDisplay 
-      result={formatEstimateItemsForDisplay()} 
-      onReset={resetEstimate} 
-    />
+    <div class="relative">
+      <EstimateDisplay 
+        result={formatEstimateItemsForDisplay()} 
+        onReset={resetEstimate} 
+      />
+      
+      <!-- AI Estimator Toggle Button -->
+      <div class="fixed bottom-6 right-6 flex flex-col items-end space-y-2">
+        <div class="bg-white dark:bg-gray-800 text-xs text-gray-500 dark:text-gray-400 p-2 rounded-md shadow-md flex items-center mb-2">
+          <Keyboard class="h-3 w-3 mr-1" />
+          <span>Ctrl+K</span>
+        </div>
+        <button
+          class="bg-primary text-white p-3 rounded-full shadow-lg hover:bg-primary/90 transition-colors"
+          on:click={toggleAiSidebar}
+          aria-label="Toggle AI Estimator"
+        >
+          <MessageSquare class="h-6 w-6" />
+        </button>
+      </div>
+    </div>
   {:else}
-    <EstimatorForm projectId={projectId} projectData={project} />
+    <div class="relative">
+      <EstimatorForm projectId={projectId} projectData={project} />
+      
+      <!-- AI Estimator Toggle Button -->
+      {#if projectId}
+        <div class="fixed bottom-6 right-6 flex flex-col items-end space-y-2">
+          <div class="bg-white dark:bg-gray-800 text-xs text-gray-500 dark:text-gray-400 p-2 rounded-md shadow-md flex items-center mb-2">
+            <Keyboard class="h-3 w-3 mr-1" />
+            <span>Ctrl+Space</span>
+          </div>
+          <button
+            class="bg-primary text-white p-3 rounded-full shadow-lg hover:bg-primary/90 transition-colors"
+            on:click={toggleAiSidebar}
+            aria-label="Toggle AI Estimator"
+          >
+            <MessageSquare class="h-6 w-6" />
+          </button>
+        </div>
+      {/if}
+    </div>
   {/if}
 </div>

@@ -53,30 +53,29 @@ src/
 
 ```javascript
 // stores/projectStore.js
-import { writable, derived } from 'svelte/store';
+import { writable, derived } from "svelte/store";
 
 // Create a writable store for projects
 export const projects = writable([]);
 
 // Derived store for active projects
-export const activeProjects = derived(
-  projects,
-  $projects => $projects.filter(project => project.status === 'active')
+export const activeProjects = derived(projects, ($projects) =>
+  $projects.filter((project) => project.status === "active")
 );
 
 // Actions to modify the store
 export function addProject(project) {
-  projects.update(items => [...items, project]);
+  projects.update((items) => [...items, project]);
 }
 
 export function updateProject(id, data) {
-  projects.update(items => 
-    items.map(item => item.id === id ? { ...item, ...data } : item)
+  projects.update((items) =>
+    items.map((item) => (item.id === id ? { ...item, ...data } : item))
   );
 }
 
 export function deleteProject(id) {
-  projects.update(items => items.filter(item => item.id !== id));
+  projects.update((items) => items.filter((item) => item.id !== id));
 }
 ```
 
@@ -86,7 +85,7 @@ export function deleteProject(id) {
 
 ```javascript
 // services/api.js
-const API_BASE_URL = 'http://localhost:3000/api';
+const API_BASE_URL = `${process.env.BACKEND_URL}/api`;
 
 // Generic API request function
 async function apiRequest(endpoint, options = {}) {
@@ -95,25 +94,25 @@ async function apiRequest(endpoint, options = {}) {
     'Content-Type': 'application/json',
     ...options.headers
   };
-  
+
   // Add auth token if available
   const token = localStorage.getItem('token');
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
-  
+
   const config = {
     ...options,
     headers
   };
-  
+
   const response = await fetch(url, config);
-  
+
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.message || 'API request failed');
   }
-  
+
   return response.json();
 }
 
@@ -141,26 +140,26 @@ Authentication will be handled using JWT tokens stored in localStorage. A dedica
 
 ```javascript
 // stores/authStore.js
-import { writable, derived } from 'svelte/store';
+import { writable, derived } from "svelte/store";
 
-export const user = writable(JSON.parse(localStorage.getItem('user')) || null);
-export const token = writable(localStorage.getItem('token') || null);
-export const isAuthenticated = derived(token, $token => !!$token);
+export const user = writable(JSON.parse(localStorage.getItem("user")) || null);
+export const token = writable(localStorage.getItem("token") || null);
+export const isAuthenticated = derived(token, ($token) => !!$token);
 
 // Update localStorage when the stores change
-user.subscribe($user => {
+user.subscribe(($user) => {
   if ($user) {
-    localStorage.setItem('user', JSON.stringify($user));
+    localStorage.setItem("user", JSON.stringify($user));
   } else {
-    localStorage.removeItem('user');
+    localStorage.removeItem("user");
   }
 });
 
-token.subscribe($token => {
+token.subscribe(($token) => {
   if ($token) {
-    localStorage.setItem('token', $token);
+    localStorage.setItem("token", $token);
   } else {
-    localStorage.removeItem('token');
+    localStorage.removeItem("token");
   }
 });
 
@@ -181,39 +180,35 @@ Since we're using Svelte (not SvelteKit), we'll need to implement client-side ro
 
 ```javascript
 // Example using svelte-spa-router
-import Router from 'svelte-spa-router';
-import { wrap } from 'svelte-spa-router/wrap';
+import Router from "svelte-spa-router";
+import { wrap } from "svelte-spa-router/wrap";
 
-import Dashboard from './views/Dashboard.svelte';
-import Projects from './views/Projects.svelte';
-import ProjectDetail from './views/ProjectDetail.svelte';
-import Login from './views/Login.svelte';
-import NotFound from './views/NotFound.svelte';
+import Dashboard from "./views/Dashboard.svelte";
+import Projects from "./views/Projects.svelte";
+import ProjectDetail from "./views/ProjectDetail.svelte";
+import Login from "./views/Login.svelte";
+import NotFound from "./views/NotFound.svelte";
 
-import { isAuthenticated } from './stores/authStore';
+import { isAuthenticated } from "./stores/authStore";
 
 // Define routes
 const routes = {
-  '/': wrap({
+  "/": wrap({
     component: Dashboard,
     conditions: [
-      () => isAuthenticated.get() // Only allow if authenticated
-    ]
+      () => isAuthenticated.get(), // Only allow if authenticated
+    ],
   }),
-  '/projects': wrap({
+  "/projects": wrap({
     component: Projects,
-    conditions: [
-      () => isAuthenticated.get()
-    ]
+    conditions: [() => isAuthenticated.get()],
   }),
-  '/projects/:id': wrap({
+  "/projects/:id": wrap({
     component: ProjectDetail,
-    conditions: [
-      () => isAuthenticated.get()
-    ]
+    conditions: [() => isAuthenticated.get()],
   }),
-  '/login': Login,
-  '*': NotFound
+  "/login": Login,
+  "*": NotFound,
 };
 ```
 
@@ -223,24 +218,27 @@ Implement a centralized error handling mechanism to catch and process errors con
 
 ```javascript
 // stores/errorStore.js
-import { writable } from 'svelte/store';
+import { writable } from "svelte/store";
 
 export const errors = writable([]);
 
 export function addError(error) {
   const id = Date.now();
-  errors.update(items => [...items, { id, message: error.message, timestamp: new Date() }]);
-  
+  errors.update((items) => [
+    ...items,
+    { id, message: error.message, timestamp: new Date() },
+  ]);
+
   // Auto-remove after 5 seconds
   setTimeout(() => {
     removeError(id);
   }, 5000);
-  
+
   return id;
 }
 
 export function removeError(id) {
-  errors.update(items => items.filter(item => item.id !== id));
+  errors.update((items) => items.filter((item) => item.id !== id));
 }
 ```
 

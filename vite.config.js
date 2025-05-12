@@ -9,7 +9,7 @@ export default defineConfig({
     proxy: {
       // Proxy API requests to backend to avoid CORS issues
       "/api": {
-        target: "http://localhost:3000",
+        target: process.env.BACKEND_URL,
         changeOrigin: true,
         secure: false,
       },

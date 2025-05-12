@@ -9,8 +9,8 @@
   import { supabase } from '$lib/supabase';
   import { onMount } from 'svelte';
   import EstimateDisplay from './EstimateDisplay.svelte';
+  import { API_AGENT_URL } from "$lib/components/ui/sidebar/constants";
 
-  // Props
   export let projectId = null;
   export let projectData = null;
 
@@ -34,7 +34,6 @@
     responseStructure: createDefaultResponseStructure()
   });
   
-  // Pre-fill form with project data if available
   onMount(() => {
     if (projectData) {
       $formData.projectDetails.title = projectData.name || '';
@@ -42,12 +41,10 @@
     }
   });
 
-  // Convert response structure to JSON string for textarea
   function updateResponseStructureJson() {
     responseStructureJson = JSON.stringify($formData.responseStructure, null, 2);
   }
 
-  // Update response structure from JSON string
   function updateResponseStructure() {
     try {
       $formData.responseStructure = JSON.parse(responseStructureJson);
@@ -66,22 +63,17 @@
     result = null;
 
     try {
-      // Make sure the response structure is valid JSON
       updateResponseStructure();
       if (error) {
         loading = false;
         return;
       }
 
-      // Get the current session for the JWT token
       const { data: { session } } = await supabase.auth.getSession();
-      
-      // Check if user is authenticated
       if (!$user || !session) {
         throw new Error('Authentication required. Please log in to generate an estimate.');
       }
       
-      // Create or update project in database if needed
       let currentProjectId = projectId;
       if (!currentProjectId) {
         const { data: projectData, error: projectError } = await supabase
@@ -103,8 +95,7 @@
         currentProjectId = projectData.id;
       }
       
-      // Call the agent API to generate the estimate
-      const response = await fetch('http://localhost:3000/api/agent', {
+      const response = await fetch(API_AGENT_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -119,7 +110,6 @@
 
       result = await response.json();
       
-      // Save the estimate items to the database
       if (result && result.estimate && result.estimate.lineItems) {
         await saveEstimateItems(currentProjectId, result.estimate);
       }
@@ -131,11 +121,9 @@
     }
   }
   
-  // Save estimate items to the database
   async function saveEstimateItems(projectId, estimate) {
     saveLoading = true;
     try {
-      // First, delete any existing items for this project
       const { error: deleteError } = await supabase
         .from('estimate_items')
         .delete()
@@ -143,12 +131,9 @@
       
       if (deleteError) throw deleteError;
       
-      // Prepare items for insertion
       const itemsToInsert = [];
       
-      // Process main items
       estimate.lineItems.forEach((item, index) => {
-        // Add main item
         const mainItem = {
           project_id: projectId,
           title: item.description,
@@ -165,10 +150,7 @@
         
         itemsToInsert.push(mainItem);
         
-        // Process sub-items if they exist
         if (item.subItems && item.subItems.length > 0) {
-          // We'll need to add these after we have the parent IDs
-          // This will be handled in a second pass
         }
       });
       

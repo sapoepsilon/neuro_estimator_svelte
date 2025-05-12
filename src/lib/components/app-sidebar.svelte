@@ -3,7 +3,7 @@
   import { onMount } from 'svelte';
   import { user, signOut } from "../../stores/authStore";
   import { supabase } from "$lib/supabase";
-  import AgentChat from "$lib/components/ai-agent/agent-chat.svelte";
+
   
   // Sidebar state
   let collapsed = false;
@@ -29,10 +29,7 @@
   let startX: number;
   let startWidth: number;
   
-  // Mode state (regular or agent)
-  let mode = "regular";
-  let selectedProject = null;
-  let selectedProjectName = null;
+
   
   // Props
   export let openLoginDialog = () => {};
@@ -104,6 +101,8 @@
   
   function createNewProject() {
     window.location.hash = '/estimator';
+    window.dispatchEvent(new CustomEvent('newProject'));
+    window.dispatchEvent(new CustomEvent('hideAiSidebar'));
     if (isMobile) {
       sidebarVisible = false;
     }
@@ -220,17 +219,7 @@
     }
   }
   
-  // Function to switch to AI agent mode
-  function switchToAgentMode(project) {
-    selectedProject = project.id;
-    selectedProjectName = project.name;
-    mode = "agent";
-  }
-  
-  // Function to switch back to regular mode
-  function switchToRegularMode() {
-    mode = "regular";
-  }
+
   
   // Set up event listeners
   onMount(() => {
@@ -284,7 +273,7 @@
   <!-- Full-height resize handle (only visible when not collapsed and not on mobile) -->
   {#if !collapsed && !isMobile}
     <button 
-      class="absolute right-0 top-0 bottom-0 w-4 cursor-ew-resize hover:bg-primary/20 active:bg-primary/40 z-20 border-0 p-0 m-0 bg-transparent flex items-center justify-center transition-colors duration-150 {isResizing ? 'bg-primary/30' : ''}"
+      class="absolute right-0 top-0 bottom-0 w-0.1 cursor-ew-resize hover:bg-primary/20 active:bg-primary/40 z-20 border-0 p-0 m-0 bg-transparent flex items-center justify-center transition-colors duration-150 {isResizing ? 'bg-primary/30' : ''}"
       on:mousedown={startResize}
       aria-label="Resize sidebar"
       tabindex="0"
@@ -293,14 +282,7 @@
       <span class="sr-only">Drag to resize sidebar</span>
     </button>
   {/if}
-  {#if mode === "agent"}
-    <!-- AI Agent Chat Mode -->
-    <AgentChat 
-      onBackToRegularMode={switchToRegularMode} 
-      projectId={selectedProject}
-      projectName={selectedProjectName}
-    />
-  {:else}
+
     <!-- Regular Sidebar Mode -->
     <!-- Header -->
     <div class="p-4 border-b flex items-center justify-between relative">
@@ -384,16 +366,7 @@
                   <span class="ml-3 text-sm truncate">{project.name}</span>
                 {/if}
               </a>
-              <!-- AI Agent button -->
-              {#if !collapsed || isMobile}
-                <button 
-                  class="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full opacity-0 group-hover:opacity-100 hover:bg-slate-200 dark:hover:bg-slate-700 transition-opacity"
-                  on:click={() => switchToAgentMode(project)}
-                  title="Open AI agent for this project"
-                >
-                  <MessageSquare class="h-4 w-4 text-slate-600" />
-                </button>
-              {/if}
+
             </li>
           {/each}
         </ul>
@@ -436,5 +409,4 @@
       <p class="text-xs">Neuro Estimator v0.0.1 Alpha</p>
     {/if}
     </div>
-  {/if}
 </div>
