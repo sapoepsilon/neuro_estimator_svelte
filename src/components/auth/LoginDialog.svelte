@@ -90,17 +90,16 @@
       {/if}
 
       <DialogFooter class="flex flex-col sm:flex-row gap-2 sm:gap-0">
-        <Button
+        <button
           type="button"
-          variant="ghost"
           on:click={toggleAuthMode}
-          class="mt-2 sm:mt-0 w-full sm:w-auto px-4 py-2 text-center"
+          class="mt-2 sm:mt-0 w-full sm:w-auto px-4 py-2 text-center hover:bg-accent hover:text-accent-foreground rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50"
           disabled={loading}
         >
           <span class="w-full text-center">
             {isLogin ? "Need an account? Sign up" : "Already have an account? Login"}
           </span>
-        </Button>
+        </button>
         <Button type="submit" disabled={loading} class="mt-2 sm:mt-0">
           {loading ? "Processing..." : isLogin ? "Login" : "Sign Up"}
         </Button>
