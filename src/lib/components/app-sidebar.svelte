@@ -39,11 +39,9 @@
 
   const getProjects = async () => {
     if (!$user) {
-      console.log('User not yet authenticated or initialized');
       return [];
     }
     
-    console.log(`User ID: ${$user.id}`);
     try {
       // Use a direct SQL query with rpc to bypass RLS policies
       const { data, error } = await supabase.rpc('get_user_projects', {
@@ -55,7 +53,6 @@
         return [];
       }
       
-      console.log(`Projects: ${JSON.stringify(data)}`);
       return data;
     } catch (err) {
       console.error('Exception fetching projects:', err);
@@ -192,29 +189,17 @@
   
   // Hide sidebar when clicking on a link (mobile only)
   function handleLinkClick(event) {
-    // Log the link being clicked
     const href = event.currentTarget.getAttribute('href');
-    console.log(`Link clicked: ${href}`);
-    
     if (isMobile) {
       sidebarVisible = false;
     }
     
-    // If this is a project link, ensure we're properly navigating
     if (href && href.includes('/estimator?id=')) {
       const projectId = href.split('=')[1];
-      console.log(`Navigating to project ID: ${projectId}`);
-      
-      // Force a reload to ensure the estimate data is loaded
-      // First navigate to the URL
       window.location.hash = href;
-      
-      // Dispatch a custom event that the EstimatorFormWrapper can listen for
       window.dispatchEvent(new CustomEvent('projectSelected', { 
         detail: { projectId }
       }));
-      
-      // Prevent default navigation since we're handling it manually
       event.preventDefault();
     }
   }

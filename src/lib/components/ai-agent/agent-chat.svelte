@@ -79,21 +79,17 @@
         }
         
         if (messagesData && messagesData.length > 0) {
-          // Process messages - we need to parse content if it's JSON
           messages = messagesData.map(msg => {
             let processedContent = msg.content;
             
-            // Try to parse content if it's JSON
             if (typeof msg.content === 'string' && (msg.content.startsWith('{') || msg.content.startsWith('['))) {
               try {
                 const contentObj = JSON.parse(msg.content);
-                // If it has a raw_response field, use that text
                 if (contentObj.raw_response && contentObj.raw_response.text) {
                   processedContent = contentObj.raw_response.text;
                 }
               } catch (e) {
-                // If parsing fails, use the original content
-                console.log('Failed to parse message content as JSON:', e);
+                console.error('Error parsing message content:', e);
               }
             }
             
@@ -106,7 +102,6 @@
           });
         }
       } else {
-        // No existing conversation, create a welcome message
         messages = [
           {
             role: 'assistant' as const,
@@ -219,16 +214,12 @@
       let accessToken = '';
       
       if ($user) {
-        console.log('User from store:', $user);
         const { data } = await supabase.auth.getSession();
         accessToken = data.session?.access_token || '';
       } else {
-        console.log('No user in store, getting session directly');
         const { data } = await supabase.auth.getSession();
         accessToken = data.session?.access_token || '';
       }
-      
-      console.log(`Using access token: ${accessToken ? 'Token available' : 'No token'}`);
       
       try {
         response = await fetch(API_AGENT_PROMPT_URL, {

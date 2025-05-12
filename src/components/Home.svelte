@@ -53,7 +53,6 @@
     const latestProject = await getLatestProject();
     
     if (latestProject) {
-      console.log(`Redirecting to latest project: ${latestProject.id}`);
       window.location.hash = `/estimator?id=${latestProject.id}`;
       
       // Dispatch project selected event

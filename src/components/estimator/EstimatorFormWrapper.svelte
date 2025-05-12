@@ -54,7 +54,6 @@
     const { data, error } = await supabase
   .rpc('get_project_estimate_items', { project_id_param: projectId })
       
-      console.log(`Fetched estimate items: ${JSON.stringify(data)}`); 
       if (error) throw error;
       
       estimateItems = data || [];
@@ -183,8 +182,6 @@
   
   // Handle new project creation event
   function handleNewProject() {
-    console.log('New project event received');
-    // Reset state for a new project
     projectId = null;
     project = null;
     estimateItems = [];

@@ -1,11 +1,31 @@
 <script lang="ts">
-  import { RevoGrid, type ColumnRegular } from '@revolist/svelte-datagrid';
+  import { RevoGrid } from '@revolist/svelte-datagrid';
+  import { onMount } from 'svelte';
 
-  export let result = null;
-  export let onReset = () => {};
+  export let result: any = null;
+  let gridSource: any[] = [];
+  let gridColumns: any[] = [];
   
-  let gridSource = [];
-  let gridColumns = [];
+  const COLUMN_WIDTHS_KEY = 'neuro-estimator-column-widths';
+  
+  type ColumnRegular = {
+    prop: string;
+    name: string;
+    size: number;
+    minSize?: number;
+    maxSize?: number;
+    sortable?: boolean;
+    filter?: boolean;
+    columnType?: string;
+  };
+  
+  type ColumnResizeDetail = {
+    [index: number]: ColumnRegular;
+  };
+  
+  onMount(() => {
+    loadColumnWidths();
+  });
   
   $: if (result && result.estimate && result.estimate.lineItems) {
     prepareGridData(result);
@@ -17,13 +37,60 @@
     
     if (!data.estimate || !data.estimate.lineItems) return;
     
-    gridColumns = [
-      { prop: 'description', name: 'Description', size: 250, minSize: 200, maxSize: 500 },
-      { prop: 'quantity', name: 'Quantity', size: 100, minSize: 80, maxSize: 150 },
-      { prop: 'unitType', name: 'Unit Type', size: 100, minSize: 80, maxSize: 150 },
-      { prop: 'unitPrice', name: 'Unit Price', size: 120, minSize: 100, maxSize: 200 },
-      { prop: 'amount', name: 'Amount', size: 120, minSize: 100, maxSize: 200 }
+    // Define default column settings
+    const defaultColumns: ColumnRegular[] = [
+      { 
+        prop: 'description', 
+        name: 'Description', 
+        size: 250, 
+        minSize: 200, 
+        maxSize: 500,
+        sortable: true,
+        filter: true
+      },
+      { 
+        prop: 'quantity', 
+        name: 'Quantity', 
+        size: 100, 
+        minSize: 80, 
+        maxSize: 150,
+        sortable: true,
+        filter: true,
+        columnType: 'numeric'
+      },
+      { 
+        prop: 'unitType', 
+        name: 'Unit Type', 
+        size: 100, 
+        minSize: 80, 
+        maxSize: 150,
+        sortable: true,
+        filter: true
+      },
+      { 
+        prop: 'unitPrice', 
+        name: 'Unit Price', 
+        size: 120, 
+        minSize: 100, 
+        maxSize: 200,
+        sortable: true,
+        filter: true,
+        columnType: 'numeric'
+      },
+      { 
+        prop: 'amount', 
+        name: 'Amount', 
+        size: 120, 
+        minSize: 100, 
+        maxSize: 200,
+        sortable: true,
+        filter: true,
+        columnType: 'numeric'
+      }
     ];
+    
+    // Apply saved column widths if available, otherwise use defaults
+    gridColumns = applySavedColumnWidths(defaultColumns);
     
     const flattenedItems = [];
     
@@ -62,6 +129,54 @@
     
     gridSource = flattenedItems;
   }
+  
+  // Save column widths to local storage
+  function saveColumnWidths(columnDetails: ColumnResizeDetail) {
+    try {
+      const widthsToSave = {};
+      
+      // Extract column widths from the resized columns
+      Object.entries(columnDetails).forEach(([index, column]) => {
+        widthsToSave[column.prop] = column.size;
+      });
+      
+      // Get existing saved widths or initialize empty object
+      const existingWidths = JSON.parse(localStorage.getItem(COLUMN_WIDTHS_KEY) || '{}');
+      
+      // Merge new widths with existing ones
+      const updatedWidths = { ...existingWidths, ...widthsToSave };
+      
+      // Save to local storage
+      localStorage.setItem(COLUMN_WIDTHS_KEY, JSON.stringify(updatedWidths));
+    } catch (error) {
+      console.error('Error saving column widths to local storage:', error);
+    }
+  }
+  
+  // Load column widths from local storage
+  function loadColumnWidths() {
+    try {
+      // This just loads the data from localStorage
+      // Actual application happens in applySavedColumnWidths
+      return JSON.parse(localStorage.getItem(COLUMN_WIDTHS_KEY) || '{}');
+    } catch (error) {
+      console.error('Error loading column widths from local storage:', error);
+      return {};
+    }
+  }
+  
+  // Apply saved column widths to the default column settings
+  function applySavedColumnWidths(defaultColumns: ColumnRegular[]) {
+    const savedWidths = loadColumnWidths();
+    
+    // Return a new array with potentially updated sizes
+    return defaultColumns.map(column => {
+      if (savedWidths[column.prop]) {
+        return { ...column, size: savedWidths[column.prop] };
+      }
+      return column;
+    });
+  }
 </script>
 
 {#if gridSource.length > 0}
@@ -84,9 +199,26 @@
       columns={gridColumns}
       theme="material"
       resize={true}
+      on:aftercolumnresize={(e) => {
+        saveColumnWidths(e.detail);
+      }}
       autoSizeColumn={true}
       exporting={true}
       stretch={true}
+      useClipboard={true}
+      range={true}
+      filter={true}
+      trimmedRows={false}
+      canSort={true}
+      columnFilterConfig={{
+        debounceTime: 250,
+        include: true,
+        showHeaderFilter: true
+      }}
+      sortable={{
+        multiple: true,
+        tripleState: true
+      }}
       rowClass={(row) => {
         if (row.isHeader) return 'font-semibold bg-slate-100';
         if (row.isSubItem) return 'text-sm text-slate-600';
@@ -100,28 +232,3 @@
     <pre class="whitespace-pre-wrap text-sm">{JSON.stringify(result, null, 2)}</pre>
   </div>
 {/if}
-
-<style>
-  /* Make the grid container take up all available space */
-  .grid-container {
-    height: calc(100vh - 300px); /* Adjust this value based on your layout */
-    min-height: 400px;
-    width: 100%;
-    position: relative;
-  }
-  
-  /* Override RevoGrid's default height settings */
-  :global(.grid-container revo-grid) {
-    height: 100% !important;
-    min-height: 100% !important;
-    width: 100% !important;
-  }
-  
-  :global(.grid-container .rgViewport) {
-    height: 100% !important;
-  }
-  
-  :global(.grid-container .main-viewport) {
-    height: 100% !important;
-  }
-</style>
