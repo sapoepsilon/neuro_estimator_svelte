@@ -7,6 +7,7 @@
   
   // Track which phase is expanded
   let expandedPhase: string | null = 'phase1';
+  let contentRef: HTMLDivElement;
   
   // Roadmap data for both toggle view and Gantt chart
   const roadmapData = [
@@ -22,6 +23,11 @@
     if (!hasSeenWelcome) {
       open = true;
       localStorage.setItem('hasSeenWelcome', 'true');
+    }
+    
+    // Ensure content is scrolled to the top when dialog opens
+    if (contentRef) {
+      contentRef.scrollTo(0, 0);
     }
   });
 
@@ -57,7 +63,7 @@
 <Dialog.Root bind:open on:openChange={handleOpenChange}>
   <Dialog.Portal>
     <Dialog.Overlay class="fixed inset-0 bg-black/50 z-50" />
-    <Dialog.Content class="fixed left-[50%] top-[50%] z-50 max-h-[85vh] w-[90vw] max-w-[750px] translate-x-[-50%] translate-y-[-50%] overflow-hidden rounded-lg bg-white p-6 shadow-xl border border-gray-100">
+    <Dialog.Content class="fixed left-[50%] top-[50%] z-50 max-h-[85vh] w-[90vw] max-w-[750px] translate-x-[-50%] translate-y-[-50%] rounded-lg bg-white p-6 shadow-xl border border-gray-100">
       <Dialog.Header>
         <Dialog.Title class="text-2xl font-bold text-center text-primary">Welcome to Estimating Agent</Dialog.Title>
         <Dialog.Description class="text-center text-gray-600 mt-2 text-base">
@@ -65,7 +71,7 @@
         </Dialog.Description>
       </Dialog.Header>
 
-      <div class="mt-5">
+      <div class="mt-5 overflow-y-auto max-h-[calc(85vh-120px)]" bind:this={contentRef}>
         <div class="bg-amber-50 border border-amber-200 rounded-md p-3 mb-4 shadow-sm">
           <h3 class="font-semibold text-amber-800 text-sm">Alpha Release</h3>
           <p class="text-amber-700 text-sm mt-1">

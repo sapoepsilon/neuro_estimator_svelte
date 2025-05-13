@@ -55,8 +55,13 @@
     prepareGridData(result);
   }
   
-  $: if (projectId) {
-    // Update when projectId changes
+  // Track previous projectId to prevent unnecessary reloads
+  let previousProjectId: string | null = null;
+  
+  $: if (projectId && projectId !== previousProjectId) {
+    // Only update when projectId actually changes to a new value
+    console.log('ProjectId changed from', previousProjectId, 'to', projectId);
+    previousProjectId = projectId;
     loadProjectData(projectId);
   }
   
@@ -170,10 +175,6 @@
         editorSource: [
           { label: 'Hour', value: 'hour' },
           { label: 'Day', value: 'day' },
-          { label: 'Week', value: 'week' },
-          { label: 'Month', value: 'month' },
-          { label: 'Item', value: 'item' },
-          { label: 'Service', value: 'service' },
           { label: 'Unit', value: 'unit' },
           { label: 'Square Foot', value: 'sq-ft' },
           { label: 'Board Foot', value: 'board-ft' },
@@ -349,6 +350,7 @@
   // Calculate amount based on quantity and unit price
   function calculateAmount() {
     newItem.amount = newItem.quantity * newItem.unitPrice;
+    newItem.amount = parseFloat(newItem.amount.toFixed(2));
   }
   
   // Handle adding a new item
@@ -379,7 +381,7 @@
         description: newItem.description,
         quantity: newItem.quantity,
         unit_price: newItem.unitPrice,
-        unit_type: newItem.unitType,
+        unit_type: newItem.unitType, // This will use the selected unit type from the dropdown
         cost_type: newItem.costType,
         amount: newItem.amount,
         currency: result.estimate?.currency || 'USD',
@@ -393,6 +395,8 @@
           ai_generated: false
         }
       };
+      
+      console.log('Adding new item with unit type:', newItem.unitType);
       
       // Add the item using Supabase
       const { data: savedItem, error } = await supabase
@@ -408,12 +412,14 @@
       // Dispatch an event to notify parent components that a new item was added
       dispatch('itemAdded', savedItem);
       
-      // Reset the form
+      // Reset the form but keep the last used unit type and cost type for convenience
+      const lastUnitType = newItem.unitType;
+      const lastCostType = newItem.costType;
       newItem = {
         description: '',
         quantity: 1,
-        unitType: 'hour',
-        costType: 'material',
+        unitType: lastUnitType, // Keep the last selected unit type
+        costType: lastCostType, // Keep the last selected cost type
         unitPrice: 0,
         amount: 0
       };
@@ -430,6 +436,11 @@
   // Toggle the new item form
   function toggleNewItemForm() {
     showNewItemForm = !showNewItemForm;
+    
+    // If we're showing the form, recalculate the amount to ensure it's correct
+    if (showNewItemForm) {
+      calculateAmount();
+    }
   }
   
   // Handle deleting an item
@@ -769,10 +780,6 @@
               >
                 <option value="hour">Hour</option>
                 <option value="day">Day</option>
-                <option value="week">Week</option>
-                <option value="month">Month</option>
-                <option value="item">Item</option>
-                <option value="service">Service</option>
                 <option value="unit">Unit</option>
                 <option value="sq-ft">Square Foot</option>
                 <option value="board-ft">Board Foot</option>

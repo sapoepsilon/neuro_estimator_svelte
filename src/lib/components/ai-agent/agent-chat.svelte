@@ -104,6 +104,18 @@
               created_at: msg.created_at
             };
           });
+        } else {
+          // No messages found for this conversation, but we have a conversation ID
+          // Add a welcome message to get started
+          console.log('No messages found for conversation ID:', internalConversationId);
+          messages = [
+            {
+              role: 'assistant' as const,
+              content: projectName 
+                ? `Welcome to the Estimating Agent AI Agent for project "${projectName}". How can I help you with your estimation?`
+                : 'Welcome to the Estimating Agent AI Agent. How can I help you with your estimation?'
+            }
+          ];
         }
       } else {
         messages = [

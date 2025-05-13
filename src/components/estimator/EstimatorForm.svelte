@@ -69,27 +69,6 @@
         throw new Error('Authentication required. Please log in to generate an estimate.');
       }
       
-      let currentProjectId = projectId;
-      if (!currentProjectId) {
-        const { data: projectData, error: projectError } = await supabase
-          .from('projects')
-          .insert([
-            { 
-              name: $formData.projectDetails.title,
-              description: $formData.projectDetails.description,
-              created_by: $user.id
-            }
-          ])
-          .select()
-          .single();
-        
-        if (projectError) {
-          throw new Error(`Failed to create project: ${projectError.message}`);
-        }
-        
-        currentProjectId = projectData.id;
-      }
-      
       const response = await fetch(API_AGENT_URL, {
         method: 'POST',
         headers: {
@@ -106,8 +85,8 @@
       result = await response.json();
       
       if (result && result.estimate && result.estimate.lineItems) {
-        await saveEstimateItems(currentProjectId, result.estimate);
-        window.location.href = `#/estimator?id=${currentProjectId}`;
+        await saveEstimateItems(result.projectId, result.estimate);
+        window.location.href = `#/estimator?id=${result.projectId}`;
         window.location.reload();
       }
     } catch (err) {
