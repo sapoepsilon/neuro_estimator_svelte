@@ -110,8 +110,8 @@
           {
             role: 'assistant' as const,
             content: projectName 
-              ? `Welcome to the Neuro Estimator AI Agent for project "${projectName}". How can I help you with your estimation?`
-              : 'Welcome to the Neuro Estimator AI Agent. How can I help you with your estimation?'
+              ? `Welcome to the Estimate Agent AI Agent for project "${projectName}". How can I help you with your estimation?`
+              : 'Welcome to the Estimate Agent AI Agent. How can I help you with your estimation?'
           }
         ];
       }
