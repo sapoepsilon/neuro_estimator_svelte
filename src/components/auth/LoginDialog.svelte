@@ -47,12 +47,6 @@
         // Close the dialog only if signup was successful
         if (user) {
           onOpenChange(false);
-          
-          // Additional toast to make the verification requirement very clear
-          toast("Account Created", {
-            description: "Your account has been created. Please verify your email to continue.",
-            duration: 5000,
-          });
         }
       }
     } catch (err) {
