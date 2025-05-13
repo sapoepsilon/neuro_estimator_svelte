@@ -1,19 +1,30 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import path from "path";
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  // Load env variables based on mode
+  const env = loadEnv(mode, process.cwd());
+  const backendUrl = env.VITE_BACKEND_URL || "http://localhost:3000";
+  
+  return {
   plugins: [svelte()],
   server: {
     proxy: {
       // Proxy API requests to backend to avoid CORS issues
       "/api": {
-        target: process.env.BACKEND_URL,
+        target: backendUrl,
         changeOrigin: true,
         secure: false,
+        rewrite: (path) => path.replace(/^\/api/, ''),
       },
     },
+    cors: true, // Enable CORS for development server
+  },
+  build: {
+    // Generate source maps for better debugging
+    sourcemap: true,
   },
   css: {
     // Disable CSS modules
@@ -24,4 +35,5 @@ export default defineConfig({
       $lib: path.resolve("./src/lib"),
     },
   },
+  };
 });
