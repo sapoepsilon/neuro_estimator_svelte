@@ -50,6 +50,13 @@ export const defaultUnitTypeDefinition = {
   description: "Type of unit being measured"
 };
 
+// Default cost type definition
+export const defaultCostTypeDefinition = {
+  type: "string",
+  enum: ["material", "labor", "equipment", "subcontractor", "other"],
+  description: "Type of cost (material, labor, etc.)"
+};
+
 // Create a field definition helper
 export const createFieldDefinition = (type, description) => ({
   type,
@@ -71,6 +78,7 @@ export const createDefaultLineItemDefinition = () => ({
   quantity: createFieldDefinition("number", "Quantity of units"),
   unitPrice: createFieldDefinition("number", "Price per unit"),
   unitType: { ...defaultUnitTypeDefinition },
+  costType: { ...defaultCostTypeDefinition },
   amount: createFieldDefinition("number", "Total amount for this line item (quantity × unitPrice)"),
   subItems: [createDefaultSubItemDefinition()]
 });
@@ -94,5 +102,6 @@ export default {
   createDefaultLineItemDefinition,
   createDefaultEstimateDefinition,
   createDefaultResponseStructure,
-  defaultUnitTypeDefinition
+  defaultUnitTypeDefinition,
+  defaultCostTypeDefinition
 };

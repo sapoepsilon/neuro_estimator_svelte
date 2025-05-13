@@ -5,6 +5,7 @@
   import { supabase } from '$lib/supabase';
   import * as XLSX from 'xlsx';
   import { user } from '../../stores/authStore';
+  import { toast } from "svelte-sonner";
 
   export let result: any = null;
   export let projectId: string | null = null;
@@ -16,7 +17,8 @@
     quantity: 1,
     unitType: 'hour',
     unitPrice: 0,
-    amount: 0
+    amount: 0,
+    costType: 'material'
   };
   
   const dispatch = createEventDispatcher();
@@ -33,6 +35,9 @@
     filter?: boolean;
     columnType?: string;
     cellTemplate?: (h: any, props: any) => any;
+    editor?: boolean | string;
+    editorSource?: Array<{label: string, value: string}>;
+    readonly?: boolean | ((props: any) => boolean);
   };
   
   type ColumnResizeDetail = {
@@ -60,6 +65,8 @@
     if (!id) return;
     
     try {
+      console.log('Loading project data for ID:', id);
+      
       // Fetch the project data from Supabase
       const { data: projectData, error: projectError } = await supabase
         .from('projects')
@@ -68,6 +75,7 @@
         .single();
       
       if (projectError) throw projectError;
+      console.log('Project data loaded:', projectData);
       
       // Fetch the estimate items for this project
       const { data: estimateItems, error: itemsError } = await supabase
@@ -77,6 +85,7 @@
         .order('created_at', { ascending: true });
       
       if (itemsError) throw itemsError;
+      console.log('Estimate items loaded:', estimateItems);
       
       // Format the data to match the expected structure for the grid
       const formattedResult = {
@@ -84,15 +93,20 @@
           title: projectData.name,
           description: projectData.description,
           currency: 'USD',
-          lineItems: estimateItems.map(item => ({
-            description: item.title,
-            quantity: item.quantity,
-            unitType: item.unit_type,
-            unitPrice: item.unit_price,
-            amount: item.amount,
-            subItems: []
-          })),
-          totalAmount: estimateItems.reduce((sum, item) => sum + item.amount, 0)
+          lineItems: estimateItems.map(item => {
+            console.log('Processing item with ID:', item.id);
+            return {
+              id: item.id,
+              description: item.title,
+              quantity: item.quantity,
+              unitType: item.unit_type,
+              costType: item.cost_type || 'material',
+              unitPrice: item.unit_price,
+              amount: item.amount,
+              subItems: []
+            };
+          }),
+          totalAmount: estimateItems.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0)
         }
       };
       
@@ -101,11 +115,13 @@
       prepareGridData(formattedResult);
     } catch (error) {
       console.error('Error loading project data:', error);
+      toast.error('Error loading project data: ' + error.message);
     }
   }
   
   // Function to refresh the data - can be called from outside
   export function refreshData() {
+    console.log('Refreshing data for project ID:', projectId);
     if (projectId) {
       loadProjectData(projectId);
     }
@@ -126,7 +142,9 @@
         minSize: 200, 
         maxSize: 500,
         sortable: true,
-        filter: true
+        filter: true,
+        editor: true,
+        readonly: (props) => props.model.isTotal || props.model.isSubItem
       },
       { 
         prop: 'quantity', 
@@ -136,7 +154,9 @@
         maxSize: 150,
         sortable: true,
         filter: true,
-        columnType: 'numeric'
+        columnType: 'numeric',
+        editor: 'number',
+        readonly: (props) => props.model.isTotal || props.model.isSubItem
       },
       { 
         prop: 'unitType', 
@@ -145,7 +165,40 @@
         minSize: 80, 
         maxSize: 150,
         sortable: true,
-        filter: true
+        filter: true,
+        editor: 'select',
+        editorSource: [
+          { label: 'Hour', value: 'hour' },
+          { label: 'Day', value: 'day' },
+          { label: 'Week', value: 'week' },
+          { label: 'Month', value: 'month' },
+          { label: 'Item', value: 'item' },
+          { label: 'Service', value: 'service' },
+          { label: 'Unit', value: 'unit' },
+          { label: 'Square Foot', value: 'sq-ft' },
+          { label: 'Board Foot', value: 'board-ft' },
+          { label: 'Package', value: 'package' },
+          { label: 'Linear Foot', value: 'linear-ft' }
+        ],
+        readonly: (props) => props.model.isTotal || props.model.isSubItem
+      },
+      { 
+        prop: 'costType', 
+        name: 'Cost Type', 
+        size: 100, 
+        minSize: 80, 
+        maxSize: 150,
+        sortable: true,
+        filter: true,
+        editor: 'select',
+        editorSource: [
+          { label: 'Material', value: 'material' },
+          { label: 'Labor', value: 'labor' },
+          { label: 'Equipment', value: 'equipment' },
+          { label: 'Subcontractor', value: 'subcontractor' },
+          { label: 'Other', value: 'other' }
+        ],
+        readonly: (props) => props.model.isTotal || props.model.isSubItem
       },
       { 
         prop: 'unitPrice', 
@@ -155,7 +208,9 @@
         maxSize: 200,
         sortable: true,
         filter: true,
-        columnType: 'numeric'
+        columnType: 'numeric',
+        editor: 'number',
+        readonly: (props) => props.model.isTotal || props.model.isSubItem
       },
       { 
         prop: 'amount', 
@@ -165,7 +220,8 @@
         maxSize: 200,
         sortable: true,
         filter: true,
-        columnType: 'numeric'
+        columnType: 'numeric',
+        readonly: true
       },
       {
         prop: 'actions',
@@ -207,10 +263,11 @@
     
     data.estimate.lineItems.forEach((item, index) => {
       flattenedItems.push({
-        id: `item-${index}`,
+        id: item.id, // Use the actual database ID directly
         description: item.description,
         quantity: item.quantity,
         unitType: item.unitType,
+        costType: item.costType || 'material',
         unitPrice: item.unitPrice,
         amount: item.amount,
         isHeader: true
@@ -323,6 +380,7 @@
         quantity: newItem.quantity,
         unit_price: newItem.unitPrice,
         unit_type: newItem.unitType,
+        cost_type: newItem.costType,
         amount: newItem.amount,
         currency: result.estimate?.currency || 'USD',
         total_amount: newItem.amount,
@@ -355,6 +413,7 @@
         description: '',
         quantity: 1,
         unitType: 'hour',
+        costType: 'material',
         unitPrice: 0,
         amount: 0
       };
@@ -399,6 +458,173 @@
     }
   }
 
+  // Handle cell edit event
+  async function handleCellEdit(editEvent) {
+    try {
+      console.log(`handleCellEdit: ${JSON.stringify(editEvent)}`);
+      
+      // Extract the edited cell data - RevoGrid uses a different structure
+      const { prop, model, val, value: oldVal, rowIndex } = editEvent;
+      
+      console.log('Cell edit event processed:', { prop, model, val, oldVal, rowIndex });
+      
+      // Skip if value hasn't changed
+      if (val === oldVal) return;
+      
+      // The model contains the row data directly
+      const rowData = model;
+      console.log('Row data from model:', rowData);
+      
+      if (!rowData || rowData.isTotal) return;
+      
+      // Get the item ID directly from the model
+      let itemId = rowData.id;
+      console.log('Item ID from model:', itemId);
+      
+      // If the ID is not a number, try to extract it from the string format
+      if (typeof itemId === 'string' && itemId.startsWith('item-')) {
+        const parts = itemId.split('-');
+        if (parts.length > 1 && !isNaN(Number(parts[1]))) {
+          itemId = Number(parts[1]);
+        }
+      }
+      
+      console.log('Final itemId for database update:', itemId);
+      
+      // If we still don't have a valid ID, we can't update the database
+      if (!itemId) {
+        console.error('No valid item ID found for database update');
+        toast.error('Could not update: No valid item ID');
+        return;
+      }
+      
+      // Calculate new amount if quantity or unitPrice changed
+      let newAmount = rowData.amount;
+      if (prop === 'quantity' || prop === 'unitPrice') {
+        // Parse values to ensure they're numbers
+        const quantity = prop === 'quantity' ? parseFloat(val) : parseFloat(rowData.quantity);
+        const unitPrice = prop === 'unitPrice' ? parseFloat(val) : parseFloat(rowData.unitPrice);
+        
+        // Update the local data
+        if (prop === 'quantity') {
+          rowData.quantity = quantity;
+        } else if (prop === 'unitPrice') {
+          rowData.unitPrice = unitPrice;
+        }
+        
+        // Recalculate amount
+        newAmount = quantity * unitPrice;
+        rowData.amount = newAmount;
+        
+        console.log('Recalculated amount:', newAmount);
+        
+        // Update the grid source to reflect the new amount
+        // We need to update the specific row in the data array
+        if (editEvent.data && Array.isArray(editEvent.data)) {
+          // Find the index of the row in the data array
+          const dataIndex = editEvent.data.findIndex(item => item.id === itemId);
+          if (dataIndex >= 0) {
+            editEvent.data[dataIndex].amount = newAmount;
+            // Update the grid source
+            gridSource = [...editEvent.data];
+          }
+        } else {
+          // Fallback to refreshing all data
+          refreshData();
+        }
+        
+        // Also need to update the total row
+        updateTotalAmount();
+      }
+      
+      // Map grid property names to database column names
+      const propToColumnMap = {
+        'description': 'title',
+        'quantity': 'quantity',
+        'unitType': 'unit_type',
+        'costType': 'cost_type',
+        'unitPrice': 'unit_price',
+        'amount': 'amount'
+      };
+      
+      // Prepare data for database update
+      const updateData: Record<string, any> = {};
+      
+      // Handle different data types appropriately
+      if (prop === 'quantity' || prop === 'unitPrice') {
+        // Make sure we're sending a number to the database
+        const numValue = typeof val === 'string' ? parseFloat(val) : val;
+        updateData[propToColumnMap[prop]] = isNaN(numValue) ? 0 : numValue;
+      } else {
+        updateData[propToColumnMap[prop] || prop] = val;
+      }
+      
+      // If amount was recalculated, update that too
+      if (prop === 'quantity' || prop === 'unitPrice') {
+        updateData.amount = newAmount;
+        updateData.total_amount = newAmount; // Update total_amount field too
+      }
+      
+      console.log('Sending update to database:', { itemId, updateData });
+      
+      try {
+        // Update the database
+        const { data, error } = await supabase
+          .from('estimate_items')
+          .update(updateData)
+          .eq('id', itemId)
+          .select();
+        
+        if (error) {
+          console.error('Supabase update error:', error);
+          throw error;
+        }
+        
+        console.log('Database update successful:', data);
+        
+        // Show success toast
+        toast.success('Item updated successfully');
+        
+        // Refresh the data to ensure UI is in sync with database
+        // Use a short timeout to allow the UI to update first
+        setTimeout(() => {
+          refreshData();
+        }, 100);
+      } catch (dbError) {
+        console.error('Database update failed:', dbError);
+        toast.error(`Database update failed: ${dbError.message || 'Unknown error'}`);
+        // Refresh to ensure UI is in sync with database
+        refreshData();
+      }
+      
+    } catch (error) {
+      console.error('Error updating item:', error);
+      toast.error('Failed to update item: ' + error.message);
+      
+      // Refresh data to revert changes in UI
+      refreshData();
+    }
+  }
+  
+  // Update the total amount in the grid
+  function updateTotalAmount() {
+    // Calculate new total
+    const newTotal = gridSource
+      .filter(item => !item.isTotal && !item.isSubItem)
+      .reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+    
+    // Update the total row
+    const totalRow = gridSource.find(row => row.isTotal);
+    if (totalRow) {
+      totalRow.amount = newTotal;
+    }
+    
+    // Update the result object
+    if (result && result.estimate) {
+      result.estimate.totalAmount = newTotal;
+    }
+  }
+
   function exportToExcel() {
     if (!gridSource || gridSource.length === 0) {
       alert('No data to export');
@@ -439,6 +665,38 @@
     }
   }
 </script>
+
+<style>
+  /* Fix for invisible text in editable cells */
+  :global(.revogr-edit) {
+    color: #000 !important;
+    background-color: #fff !important;
+    border: 1px solid #4299e1 !important;
+    padding: 4px !important;
+  }
+  
+  :global(.revogr-focus) {
+    border: 1px solid #4299e1 !important;
+  }
+  
+  :global(.revo-dropdown-list) {
+    color: #000 !important;
+    background-color: #fff !important;
+    max-height: 200px !important;
+    overflow-y: auto !important;
+    z-index: 1000 !important;
+  }
+  
+  :global(.revo-dropdown-list .selected) {
+    background-color: #4299e1 !important;
+    color: white !important;
+  }
+  
+  :global(.grid-container) {
+    height: 500px;
+    width: 100%;
+  }
+</style>
 
 {#if gridSource.length > 0}
   <div class="bg-white rounded-md shadow mb-4">
@@ -515,6 +773,25 @@
                 <option value="month">Month</option>
                 <option value="item">Item</option>
                 <option value="service">Service</option>
+                <option value="unit">Unit</option>
+                <option value="sq-ft">Square Foot</option>
+                <option value="board-ft">Board Foot</option>
+                <option value="package">Package</option>
+                <option value="linear-ft">Linear Foot</option>
+              </select>
+            </div>
+            <div>
+              <label for="item-cost-type" class="block text-sm font-medium text-gray-700 mb-1">Cost Type</label>
+              <select 
+                id="item-cost-type"
+                bind:value={newItem.costType} 
+                class="w-full p-2 border border-gray-300 rounded-md"
+              >
+                <option value="material">Material</option>
+                <option value="labor">Labor</option>
+                <option value="equipment">Equipment</option>
+                <option value="subcontractor">Subcontractor</option>
+                <option value="other">Other</option>
               </select>
             </div>
             <div>
@@ -554,6 +831,9 @@
       resize={true}
       on:aftercolumnresize={(e) => {
         saveColumnWidths(e.detail);
+      }}
+      on:afteredit={(e) => {
+        handleCellEdit(e.detail);
       }}
       autoSizeColumn={true}
       exporting={true}

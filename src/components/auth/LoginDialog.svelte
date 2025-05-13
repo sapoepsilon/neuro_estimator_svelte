@@ -41,10 +41,7 @@
         await signInWithEmail(email, password);
         onOpenChange(false);
       } else {
-        // Handle signup - the toast is shown in the signUpWithEmail function
         const { user } = await signUpWithEmail(email, password);
-        
-        // Close the dialog only if signup was successful
         if (user) {
           onOpenChange(false);
         }
