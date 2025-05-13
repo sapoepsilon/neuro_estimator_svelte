@@ -4,7 +4,7 @@
   import { Label } from "$lib/components/ui/label";
   import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "$lib/components/ui/dialog";
   import { signInWithEmail, signUpWithEmail } from "../../stores/authStore";
-  import { toast } from "$lib/components/ui/sonner";
+  import { toast } from "svelte-sonner";
 
   export let open = false;
   export let onOpenChange = (value: boolean) => {};

@@ -1,6 +1,6 @@
 import { writable } from 'svelte/store';
 import { supabase } from '$lib/supabase';
-import { toast } from '$lib/components/ui/sonner';
+import { toast } from 'svelte-sonner';
 import { createVerificationToastContent } from '$lib/utils/emailUtils';
 
 // Create a writable store for the user

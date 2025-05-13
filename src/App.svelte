@@ -9,7 +9,7 @@
   import routes from './routes';
   import AppSidebar from "$lib/components/app-sidebar.svelte";
   import AiSidebar from "$lib/components/ai-sidebar.svelte";
-  import Toaster from "$lib/components/ui/sonner/toaster.svelte";
+  import { Toaster } from "$lib/components/ui/sonner";
 
   import { Menu } from "lucide-svelte";
   
