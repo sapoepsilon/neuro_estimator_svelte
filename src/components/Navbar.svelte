@@ -7,7 +7,7 @@
   <div class="w-full flex h-16 items-center px-6">
     <div class="mr-4 flex">
       <button on:click={() => window.location.hash = '/'} class="flex items-center space-x-2">
-        <span class="font-bold text-xl">Estimate Agent</span>
+        <span class="font-bold text-xl">Estimating Agent</span>
       </button>
     </div>
     

@@ -272,7 +272,7 @@
     <!-- Header -->
     <div class="p-4 border-b flex items-center justify-between relative">
       {#if !collapsed}
-        <h2 class="text-lg font-semibold">Estimate Agent</h2>
+        <h2 class="text-lg font-semibold">Estimating Agent</h2>
       {/if}
       <button 
         class="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800" 
@@ -391,7 +391,7 @@
     {/if}
     
     {#if !collapsed || isMobile}
-      <p class="text-xs">Estimate Agent v0.0.1 Alpha</p>
+      <p class="text-xs">Estimating Agent v0.0.1 Alpha</p>
     {/if}
     </div>
 </div>

@@ -59,7 +59,7 @@
     <Dialog.Overlay class="fixed inset-0 bg-black/50 z-50" />
     <Dialog.Content class="fixed left-[50%] top-[50%] z-50 max-h-[85vh] w-[90vw] max-w-[750px] translate-x-[-50%] translate-y-[-50%] overflow-hidden rounded-lg bg-white p-6 shadow-xl border border-gray-100">
       <Dialog.Header>
-        <Dialog.Title class="text-2xl font-bold text-center text-primary">Welcome to Estimate Agent</Dialog.Title>
+        <Dialog.Title class="text-2xl font-bold text-center text-primary">Welcome to Estimating Agent</Dialog.Title>
         <Dialog.Description class="text-center text-gray-600 mt-2 text-base">
           AI-Powered Construction Estimation
         </Dialog.Description>
