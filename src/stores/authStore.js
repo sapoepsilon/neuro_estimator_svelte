@@ -1,5 +1,7 @@
 import { writable } from 'svelte/store';
 import { supabase } from '$lib/supabase';
+import { toast } from '$lib/components/ui/sonner';
+import { createVerificationToastContent } from '$lib/utils/emailUtils';
 
 // Create a writable store for the user
 export const user = writable(null);
@@ -38,9 +40,27 @@ export const signUpWithEmail = async (email, password) => {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
+    options: {
+      emailRedirectTo: 'https://app.esmtagent.com/auth/callback'
+    }
   });
   
   if (error) throw error;
+  
+  // Show verification toast if signup was successful
+  if (data?.user) {
+    const { title, description, action } = createVerificationToastContent(email);
+    
+    toast(title, {
+      description,
+      duration: 10000, // 10 seconds
+      action: action ? {
+        label: action.label,
+        onClick: () => window.open(action.url, '_blank')
+      } : undefined,
+    });
+  }
+  
   return data;
 };
 

@@ -4,6 +4,7 @@
   import { Label } from "$lib/components/ui/label";
   import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "$lib/components/ui/dialog";
   import { signInWithEmail, signUpWithEmail } from "../../stores/authStore";
+  import { toast } from "$lib/components/ui/sonner";
 
   export let open = false;
   export let onOpenChange = (value: boolean) => {};
@@ -38,10 +39,22 @@
     try {
       if (isLogin) {
         await signInWithEmail(email, password);
+        onOpenChange(false);
       } else {
-        await signUpWithEmail(email, password);
+        // Handle signup - the toast is shown in the signUpWithEmail function
+        const { user } = await signUpWithEmail(email, password);
+        
+        // Close the dialog only if signup was successful
+        if (user) {
+          onOpenChange(false);
+          
+          // Additional toast to make the verification requirement very clear
+          toast("Account Created", {
+            description: "Your account has been created. Please verify your email to continue.",
+            duration: 5000,
+          });
+        }
       }
-      onOpenChange(false);
     } catch (err) {
       console.error("Auth error:", err);
       error = err.message || "Authentication failed";

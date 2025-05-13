@@ -8,7 +8,8 @@
   import Router from 'svelte-spa-router';
   import routes from './routes';
   import AppSidebar from "$lib/components/app-sidebar.svelte";
-import AiSidebar from "$lib/components/ai-sidebar.svelte";
+  import AiSidebar from "$lib/components/ai-sidebar.svelte";
+  import Toaster from "$lib/components/ui/sonner/toaster.svelte";
 
   import { Menu } from "lucide-svelte";
   
@@ -150,6 +151,8 @@ import AiSidebar from "$lib/components/ai-sidebar.svelte";
   bind:open={welcomeDialogOpen}
   onOpenChange={handleWelcomeDialogOpenChange}
 />
+
+<Toaster />
 
 <style>
   /* Global styles can be added here */
