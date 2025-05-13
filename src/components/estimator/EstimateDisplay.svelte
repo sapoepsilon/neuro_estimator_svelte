@@ -3,6 +3,7 @@
   import { onMount } from 'svelte';
   import { createEventDispatcher } from 'svelte';
   import { supabase } from '$lib/supabase';
+  import * as XLSX from 'xlsx';
   import { user } from '../../stores/authStore';
 
   export let result: any = null;
@@ -379,70 +380,62 @@
       return;
     }
     
-    // Extract the actual ID from the item ID (format: 'item-X' or 'item-X-sub-Y')
-    let itemId;
-    try {
-      // For main items, the format is 'item-{index}'
-      // For sub items, the format is 'item-{index}-sub-{subIndex}'
-      // We need to get the actual database ID from the item
-      
-      // Get the project ID from URL
-      const hash = window.location.hash;
-      const queryString = hash.split('?')[1];
-      const params = new URLSearchParams(queryString || '');
-      const projectId = params.get('id') ? parseInt(params.get('id')) : null;
-      
-      if (!projectId) {
-        alert('Project ID not found');
-        return;
-      }
-      
-      // Find the item in the database based on its properties
-      const { data: items, error: fetchError } = await supabase
-        .from('estimate_items')
-        .select('id, title, quantity, unit_price')
-        .eq('project_id', projectId)
-        .eq('title', item.description)
-        .eq('quantity', item.quantity)
-        .eq('unit_price', item.unitPrice);
-      
-      if (fetchError) {
-        throw fetchError;
-      }
-      
-      if (!items || items.length === 0) {
-        alert('Item not found in database');
-        return;
-      }
-      
-      // Use the first matching item's ID
-      itemId = items[0].id;
-      
-    } catch (error) {
-      console.error('Error finding item for deletion:', error);
-      alert('Failed to identify the item for deletion');
-      return;
-    }
-    
-    if (confirm(`Are you sure you want to delete this item?`)) {
+    if (confirm(`Are you sure you want to delete ${item.description || 'this item'}?`)) {
       try {
         const { error } = await supabase
           .from('estimate_items')
           .delete()
-          .eq('id', itemId);
+          .eq('id', item.id);
         
-        if (error) {
-          throw error;
-        }
+        if (error) throw error;
         
-        // Dispatch an event to notify parent components that an item was deleted
-        dispatch('itemDeleted', { itemId });
-        
+        // Refresh the data
+        dispatch('refresh');
         alert('Item deleted successfully');
       } catch (error) {
         console.error('Error deleting item:', error);
         alert('Failed to delete item. Please try again.');
       }
+    }
+  }
+
+  function exportToExcel() {
+    if (!gridSource || gridSource.length === 0) {
+      alert('No data to export');
+      return;
+    }
+
+    try {
+      // Prepare data for export - filter out any special rows or formatting
+      const exportData = gridSource.map(row => {
+        // Create a clean object for each row, excluding any special properties
+        const cleanRow = {};
+        
+        // Add data from each column
+        gridColumns.forEach(col => {
+          if (col.prop && typeof row[col.prop] !== 'undefined') {
+            cleanRow[col.name || col.prop] = row[col.prop];
+          }
+        });
+        
+        return cleanRow;
+      });
+
+      // Create a worksheet from the data
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      
+      // Create a workbook and add the worksheet
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Estimate');
+      
+      // Generate filename based on estimate title
+      const filename = `${result.estimate?.title || 'Project_Estimate'}.xlsx`;
+      
+      // Export the workbook
+      XLSX.writeFile(workbook, filename);
+    } catch (error) {
+      console.error('Error exporting to Excel:', error);
+      alert('Failed to export data. Please try again.');
     }
   }
 </script>
@@ -458,7 +451,16 @@
         <div class="text-right">
           <p class="text-lg font-semibold">{result.estimate?.totalAmount || 0} {result.estimate?.currency || 'USD'}</p>
         </div>
-         <div class="mt-4 flex justify-end">
+         <div class="mt-4 flex justify-end space-x-2">
+        <button 
+          on:click={exportToExcel} 
+          class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md text-sm flex items-center"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          Export as Excel
+        </button>
         <button 
           on:click={toggleNewItemForm} 
           class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm flex items-center"

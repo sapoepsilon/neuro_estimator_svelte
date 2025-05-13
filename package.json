@@ -33,6 +33,7 @@
   "dependencies": {
     "@revolist/svelte-datagrid": "^4.15.8",
     "@supabase/supabase-js": "^2.49.4",
-    "svelte-spa-router": "^4.0.1"
+    "svelte-spa-router": "^4.0.1",
+    "xlsx": "^0.18.5"
   }
 }
