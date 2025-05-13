@@ -48,4 +48,7 @@ export const signUpWithEmail = async (email, password) => {
 export const signOut = async () => {
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
+  
+  // Refresh the page after sign out
+  window.location.reload();
 };

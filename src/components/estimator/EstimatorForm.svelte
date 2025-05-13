@@ -8,7 +8,6 @@
   import { user } from '../../stores/authStore';
   import { supabase } from '$lib/supabase';
   import { onMount } from 'svelte';
-  import EstimateDisplay from './EstimateDisplay.svelte';
   import { API_AGENT_URL } from "$lib/components/ui/sidebar/constants";
 
   export let projectId = null;
@@ -27,10 +26,6 @@
       description: "",
       scope: "",
       timeline: ""    },
-    additionalRequirements: {
-      feature1: "",
-      feature2: ""
-    },
     responseStructure: createDefaultResponseStructure()
   });
   
@@ -112,6 +107,8 @@
       
       if (result && result.estimate && result.estimate.lineItems) {
         await saveEstimateItems(currentProjectId, result.estimate);
+        window.location.href = `#/estimator?id=${currentProjectId}`;
+        window.location.reload();
       }
     } catch (err) {
       error = err.message || 'Failed to generate estimate';
@@ -154,7 +151,6 @@
         }
       });
       
-      // Insert main items
       const { data: insertedItems, error: insertError } = await supabase
         .from('estimate_items')
         .insert(itemsToInsert)
@@ -162,16 +158,13 @@
       
       if (insertError) throw insertError;
       
-      // Now insert sub-items with parent references
       const subItemsToInsert = [];
       
-      // Map to find parent items by description
       const parentItemMap = {};
       insertedItems.forEach(item => {
         parentItemMap[item.title] = item.id;
       });
       
-      // Process sub-items
       estimate.lineItems.forEach((item) => {
         const parentId = parentItemMap[item.description];
         
@@ -227,15 +220,6 @@
       <CardDescription>Fill in the details to generate a project estimate</CardDescription>
     </CardHeader>
     <CardContent class="overflow-y-auto">
-      {#if result}
-        <div class="mb-6">
-          <h3 class="text-xl font-semibold mb-4">Estimate Result: {result.estimate?.title || 'Project Estimate'}</h3>
-          
-          <EstimateDisplay 
-            {result} 
-          />
-        </div>
-      {:else}
         <form on:submit|preventDefault={handleSubmit}>
           <div class="space-y-6">
             <div>
@@ -281,33 +265,6 @@
               </div>
             </div>
             
-            <div>
-              <h3 class="text-lg font-medium mb-4">Additional Requirements</h3>
-              <div class="space-y-4">
-                <div class="space-y-2">
-                  <label for="feature-1" class="text-sm font-medium">Feature 1</label>
-                  <Input 
-                    id="feature-1"
-                    bind:value={$formData.additionalRequirements.feature1} 
-                    placeholder="Description of feature 1" 
-                    type="text"
-                    class="w-full"
-                  />
-                </div>
-                
-                <div class="space-y-2">
-                  <label for="feature-2" class="text-sm font-medium">Feature 2</label>
-                  <Input 
-                    id="feature-2"
-                    bind:value={$formData.additionalRequirements.feature2} 
-                    placeholder="Description of feature 2" 
-                    type="text"
-                    class="w-full"
-                  />
-                </div>
-              </div>
-            </div>
-            
           {#if error}
             <div class="mt-4 p-3 bg-red-50 text-red-700 rounded-md">
               <p>{error}</p>
@@ -337,7 +294,6 @@
             </Button>
           </div>
         </form>
-      {/if}
     </CardContent>
   </Card>
 </div>

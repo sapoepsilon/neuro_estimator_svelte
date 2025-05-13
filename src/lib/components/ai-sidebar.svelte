@@ -109,6 +109,16 @@
         projectId={projectId}
         projectName={projectName}
         conversationId={latestConversation?.id}
+        on:aiResponseSuccess={(event) => {
+          // Dispatch a global event to notify that the AI agent has responded successfully
+          window.dispatchEvent(new CustomEvent('aiEstimateUpdated', {
+            detail: {
+              projectId: event.detail.projectId,
+              estimateId: event.detail.estimateId,
+              responseData: event.detail.responseData
+            }
+          }));
+        }}
       />
     {/if}
   </div>

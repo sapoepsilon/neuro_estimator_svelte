@@ -4,6 +4,7 @@
   import { supabase } from "$lib/supabase";
   import { user } from "../../../stores/authStore";
   import { API_AGENT_PROMPT_URL } from '../ui/sidebar/constants';
+  import { createEventDispatcher } from 'svelte';
   
   export let projectId: string | null = null;
   export let projectName: string | null = null;
@@ -30,10 +31,13 @@
   let messages: Message[] = [];
   let internalConversationId: string | null = conversationId;
   let isLoading = true;
+  let isApiLoading = false; // Track API request loading state
   let loadError: string | null = null;
   
   let newMessage = '';
   let chatContainer: HTMLElement;
+  
+  const dispatch = createEventDispatcher();
   
   // Function to load conversation history for the current project
   async function loadConversationHistory() {
@@ -221,6 +225,7 @@
         accessToken = data.session?.access_token || '';
       }
       
+      isApiLoading = true; // Set API loading state to true
       try {
         response = await fetch(API_AGENT_PROMPT_URL, {
           method: 'POST',
@@ -239,12 +244,14 @@
         
         if (!response.ok) {
           const errorText = await response.text();
+          isApiLoading = false; // Reset API loading state on error response
           throw new Error(`API responded with status: ${response.status}. Details: ${errorText}`);
         }
         
         data = await response.json();
       } catch (apiError) {
         console.error('API call error details:', apiError);
+        isApiLoading = false; // Reset API loading state on API error
         messages = [...messages, {
           role: 'system',
           content: `Error connecting to AI agent: ${apiError.message || 'Unknown error'}`,
@@ -253,12 +260,22 @@
         return;
       }
       
+      isApiLoading = false; // Reset API loading state
+      
       const assistantResponse: MessageBase = {
         role: 'assistant' as const,
         content: data.response || 'Completed'
       };
       
       messages = [...messages, assistantResponse];
+      
+      // Dispatch an event to notify that the AI agent has responded successfully
+      // This will allow other components to refresh their data
+      dispatch('aiResponseSuccess', {
+        projectId: projectId,
+        estimateId: estimateId,
+        responseData: data
+      });
       
       setTimeout(() => {
         if (chatContainer) {
@@ -269,6 +286,7 @@
     } catch (error) {
       console.error('Error sending message to AI agent:', error);
       
+      isApiLoading = false; // Reset API loading state on error
       messages = messages.filter(m => !('loading' in m));
       messages = [...messages, {
         role: 'system',
@@ -349,6 +367,14 @@
   
   <!-- Message Input -->
   <div class="p-4 border-t">
+    {#if isApiLoading}
+      <div class="flex justify-center mb-2">
+        <div class="flex items-center space-x-2 text-primary">
+          <Loader2 class="h-5 w-5 animate-spin" />
+          <span class="text-sm">Processing your request...</span>
+        </div>
+      </div>
+    {/if}
     <div class="flex items-center space-x-2">
       <input
         type="text"
@@ -356,13 +382,18 @@
         placeholder="Type your message..."
         bind:value={newMessage}
         on:keydown={handleKeydown}
+        disabled={isApiLoading}
       />
       <button 
         class="p-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
         on:click={sendMessage}
-        disabled={!newMessage.trim()}
+        disabled={!newMessage.trim() || isApiLoading}
       >
-        <Send class="h-5 w-5" />
+        {#if isApiLoading}
+          <Loader2 class="h-5 w-5 animate-spin" />
+        {:else}
+          <Send class="h-5 w-5" />
+        {/if}
       </button>
     </div>
   </div>

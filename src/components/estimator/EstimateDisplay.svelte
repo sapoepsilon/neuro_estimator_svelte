@@ -6,6 +6,7 @@
   import { user } from '../../stores/authStore';
 
   export let result: any = null;
+  export let projectId: string | null = null;
   let gridSource: any[] = [];
   let gridColumns: any[] = [];
   let showNewItemForm = false;
@@ -39,10 +40,74 @@
   
   onMount(() => {
     loadColumnWidths();
+    if (projectId && !result) {
+      loadProjectData(projectId);
+    }
   });
   
   $: if (result && result.estimate && result.estimate.lineItems) {
     prepareGridData(result);
+  }
+  
+  $: if (projectId) {
+    // Update when projectId changes
+    loadProjectData(projectId);
+  }
+  
+  // Function to load project data from the database
+  async function loadProjectData(id: string) {
+    if (!id) return;
+    
+    try {
+      // Fetch the project data from Supabase
+      const { data: projectData, error: projectError } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (projectError) throw projectError;
+      
+      // Fetch the estimate items for this project
+      const { data: estimateItems, error: itemsError } = await supabase
+        .from('estimate_items')
+        .select('*')
+        .eq('project_id', id)
+        .order('created_at', { ascending: true });
+      
+      if (itemsError) throw itemsError;
+      
+      // Format the data to match the expected structure for the grid
+      const formattedResult = {
+        estimate: {
+          title: projectData.name,
+          description: projectData.description,
+          currency: 'USD',
+          lineItems: estimateItems.map(item => ({
+            description: item.title,
+            quantity: item.quantity,
+            unitType: item.unit_type,
+            unitPrice: item.unit_price,
+            amount: item.amount,
+            subItems: []
+          })),
+          totalAmount: estimateItems.reduce((sum, item) => sum + item.amount, 0)
+        }
+      };
+      
+      // Update the result
+      result = formattedResult;
+      prepareGridData(formattedResult);
+    } catch (error) {
+      console.error('Error loading project data:', error);
+    }
+  }
+  
+  // Function to refresh the data - can be called from outside
+  export function refreshData() {
+    if (projectId) {
+      loadProjectData(projectId);
+    }
   }
   
   function prepareGridData(data) {

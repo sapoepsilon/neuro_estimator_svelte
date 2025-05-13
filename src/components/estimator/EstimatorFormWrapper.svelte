@@ -181,12 +181,32 @@
     await fetchEstimateItems();
   }
 
+  // Reference to the EstimateDisplay component
+  let estimateDisplayComponent;
+  
+  // Handler for AI estimate updates
+  function handleAiEstimateUpdated(event) {
+    const eventProjectId = event.detail.projectId;
+    
+    // Only refresh if this is for the current project
+    if (eventProjectId && eventProjectId === projectId) {
+      // Refresh the data
+      fetchEstimateItems().then(() => {
+        // If we have a reference to the EstimateDisplay component, call its refreshData method
+        if (estimateDisplayComponent && typeof estimateDisplayComponent.refreshData === 'function') {
+          estimateDisplayComponent.refreshData();
+        }
+      });
+    }
+  }
+  
   onMount(() => {
     projectId = parseUrlParams();
     
     window.addEventListener('projectSelected', handleProjectSelected);
     window.addEventListener('keydown', handleKeydown);
     window.addEventListener('newProject', handleNewProject);
+    window.addEventListener('aiEstimateUpdated', handleAiEstimateUpdated);
     
     if (!projectId) {
       loading = false;
@@ -202,6 +222,7 @@
       window.removeEventListener('projectSelected', handleProjectSelected);
       window.removeEventListener('keydown', handleKeydown);
       window.removeEventListener('newProject', handleNewProject);
+      window.removeEventListener('aiEstimateUpdated', handleAiEstimateUpdated);
     };
   });
 </script>
@@ -218,7 +239,9 @@
   {:else if projectId && estimateItems.length > 0}
     <div class="relative">
       <EstimateDisplay 
+        bind:this={estimateDisplayComponent}
         result={formatEstimateItemsForDisplay()} 
+        projectId={projectId}
         on:itemAdded={handleItemAdded}
         on:itemDeleted={handleItemDeleted}
       />
