@@ -5,6 +5,7 @@
   import { user } from "../../../stores/authStore";
   import { gridData, currentProjectId } from "../../../stores/gridStore";
   import { API_AGENT_PROMPT_URL } from '../ui/sidebar/constants';
+  import EstimateResponseCard from './estimate-response-card.svelte';
   
   export let projectId: string | null = null;
   export let projectName: string | null = null;
@@ -27,6 +28,8 @@
   
   type Message = MessageBase | LoadingMessage | ErrorMessage;
   
+
+  
   // Chat state
   let messages: Message[] = [];
   let internalConversationId: string | null = conversationId;
@@ -36,6 +39,9 @@
   
   let newMessage = '';
   let chatContainer: HTMLElement;
+  
+  // XML response handling
+  let expandedMessages: Set<string> = new Set();
   
   // Range selection state
   let rangeInput = '';
@@ -421,12 +427,42 @@
       
       isApiLoading = false; // Reset API loading state
       
+      // Create the assistant response object
       const assistantResponse: MessageBase = {
         role: 'assistant' as const,
         content: data.response || 'Completed'
       };
       
-      messages = [...messages, assistantResponse];
+      // Save the message to the database to get an ID
+      if (internalConversationId) {
+        try {
+          const { data: savedMessage, error: saveError } = await supabase
+            .from('messages')
+            .insert({
+              conversation_id: internalConversationId,
+              role: assistantResponse.role,
+              content: assistantResponse.content,
+              user_id: $user?.id
+            })
+            .select()
+            .single();
+          
+          if (saveError) {
+            console.error('Error saving assistant message:', saveError);
+            // Still add the message to the UI even if saving fails
+            messages = [...messages, assistantResponse];
+          } else if (savedMessage) {
+            // Add the saved message with ID to the messages array
+            messages = [...messages, savedMessage as MessageBase];
+          }
+        } catch (error) {
+          console.error('Error saving assistant message:', error);
+          messages = [...messages, assistantResponse];
+        }
+      } else {
+        // No conversation ID, just add to UI
+        messages = [...messages, assistantResponse];
+      }
       
       // Dispatch an event to notify that the AI agent has responded successfully
       // This will allow other components to refresh their data
@@ -453,6 +489,11 @@
         error: true
       } as ErrorMessage];
     }
+  }
+  
+  // Check if a message contains an XML estimate
+  function containsXmlEstimate(content: string): boolean {
+    return content.includes('<estimate>') && content.includes('</estimate>');
   }
   
   function handleKeydown(event: KeyboardEvent) {
@@ -559,7 +600,15 @@
                 <div class="w-2 h-2 rounded-full bg-current animate-bounce" style="animation-delay: 0.4s"></div>
               </div>
             {:else}
-              <p class="whitespace-pre-wrap break-words">{message.content}</p>
+              {#if message.role === 'assistant' && containsXmlEstimate(message.content)}
+                <EstimateResponseCard 
+                  content={message.content} 
+                  messageId={message.id} 
+                  bind:expandedMessages={expandedMessages} 
+                />
+              {:else}
+                <p class="whitespace-pre-wrap break-words">{message.content}</p>
+              {/if}
               {#if message.created_at}
                 <div class="text-xs opacity-50 mt-1">{new Date(message.created_at).toLocaleTimeString()}</div>
               {/if}
