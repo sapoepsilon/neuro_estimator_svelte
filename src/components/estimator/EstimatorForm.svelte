@@ -83,12 +83,8 @@
       }
 
       result = await response.json();
-      
-      if (result && result.estimate && result.estimate.lineItems) {
-        await saveEstimateItems(result.projectId, result.estimate);
-        window.location.href = `#/estimator?id=${result.projectId}`;
-        window.location.reload();
-      }
+      window.location.href = `#/estimator?id=${result.projectId}`;
+      window.location.reload();
     } catch (err) {
       error = err.message || 'Failed to generate estimate';
       console.error('Error submitting form:', err);
