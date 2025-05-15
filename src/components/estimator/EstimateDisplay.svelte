@@ -710,6 +710,21 @@
     z-index: 1000 !important;
   }
   
+  /* Make grid container take up available vertical space */
+  .grid-container {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 16rem); /* Adjust based on your layout */
+    min-height: 400px;
+    width: 100%;
+  }
+  
+  /* Ensure RevoGrid takes full height of its container */
+  :global(.grid-container > .revogr-holder) {
+    flex: 1;
+    height: 100% !important;
+  }
+  
   :global(.revo-dropdown-list .selected) {
     background-color: #4299e1 !important;
     color: white !important;
@@ -722,7 +737,7 @@
 </style>
 
 {#if gridSource.length > 0}
-  <div class="bg-white rounded-md shadow mb-4">
+  <div class="bg-white rounded-md shadow mb-4 flex flex-col">
     <div class="p-4 bg-slate-50 rounded-t-md border-b">
       <div class="flex justify-between items-center">
         <div>
@@ -842,7 +857,7 @@
       {/if}
     </div>
   </div>
-  <div class="grid-container">
+  <div class="grid-container flex-1">
     <RevoGrid
       source={gridSource} 
       columns={gridColumns}
