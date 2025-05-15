@@ -1,10 +1,11 @@
 <script lang="ts">
   import { RevoGrid } from '@revolist/svelte-datagrid';
-  import { onMount } from 'svelte';
+  import { onMount, setContext } from 'svelte';
   import { createEventDispatcher } from 'svelte';
   import { supabase } from '$lib/supabase';
   import * as XLSX from 'xlsx';
   import { user } from '../../stores/authStore';
+  import { gridData, currentProjectId } from '../../stores/gridStore';
   import { toast } from "svelte-sonner";
 
   export let result: any = null;
@@ -24,6 +25,17 @@
   const dispatch = createEventDispatcher();
   
   const COLUMN_WIDTHS_KEY = 'neuro-estimator-column-widths';
+  
+  // Create a context for grid data access
+  setContext('getGridData', () => {
+    return { gridSource, gridColumns };
+  });
+  
+  // Update the grid store whenever data changes
+  $: {
+    $gridData = { gridSource, gridColumns };
+    $currentProjectId = projectId;
+  }
   
   type ColumnRegular = {
     prop?: string;

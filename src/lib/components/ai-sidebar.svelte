@@ -17,47 +17,26 @@
   }
   
   async function fetchLatestConversation() {
-    if (!projectId || !$user) {
-      console.log('Skipping fetch: missing projectId or user');
-      isLoading = false; 
-      return;
-    }
-    
-    const loadingTimeout = setTimeout(() => {
-      if (isLoading) {
-        console.warn('Loading timeout reached, resetting loading state');
-        isLoading = false;
-        error = 'Loading timed out. Please try again.';
-      }
-    }, 10000);
+    if (!projectId || !$user) return;
     
     try {
-      console.log('Starting to fetch conversation for project:', projectId);
       isLoading = true;
       error = null;
       
-      // First check if the user is associated with a business
       const { data: businessUserData, error: businessUserError } = await supabase
         .from('business_users')
         .select('business_id')
         .eq('user_id', $user.id)
         .single();
       
-      if (businessUserError) {
-        console.error('Business user error:', businessUserError);
-        throw businessUserError;
-      }
+      if (businessUserError) throw businessUserError;
       
       const businessId = businessUserData?.business_id;
       
       if (!businessId) {
-        console.error('No business ID found for user');
         throw new Error('User is not associated with any business');
       }
       
-      console.log('Found business ID:', businessId);
-      
-      // Then fetch the conversation
       const { data: conversationData, error: conversationError } = await supabase
         .from('conversations')
         .select('id, created_at')
@@ -66,91 +45,23 @@
         .order('created_at', { ascending: false })
         .limit(1);
       
-      if (conversationError) {
-        console.error('Conversation fetch error:', conversationError);
-        throw conversationError;
-      }
-      
-      console.log('Conversation data:', conversationData);
+      if (conversationError) throw conversationError;
       
       if (conversationData && conversationData.length > 0) {
         latestConversation = conversationData[0];
-        console.log('Latest conversation found:', latestConversation.id);
       } else {
-        console.log('No conversation found for this project, creating a new one');
-        
-        // Create a new conversation for this project
-        try {
-          const { data: newConversation, error: newConversationError } = await supabase
-            .from('conversations')
-            .insert([{ 
-              project_id: projectId,
-              business_id: businessId,
-              created_by: $user.id 
-            }])
-            .select();
-          
-          if (newConversationError) throw newConversationError;
-          
-          if (newConversation && newConversation.length > 0) {
-            latestConversation = {
-              id: newConversation[0].id,
-              created_at: newConversation[0].created_at
-            };
-            console.log('Created new conversation:', latestConversation.id);
-          } else {
-            throw new Error('Failed to create conversation');
-          }
-        } catch (createError) {
-          console.error('Error creating new conversation:', createError);
-          latestConversation = null;
-          throw new Error('Failed to create a new conversation');
-        }
+        latestConversation = null;
       }
     } catch (e) {
       console.error('Error fetching latest conversation:', e);
       error = e instanceof Error ? e.message : 'Failed to fetch conversation data';
     } finally {
-      clearTimeout(loadingTimeout); // Clear the timeout
       isLoading = false;
-      console.log('Fetch completed, loading state set to false');
     }
   }
   
-  // Track previous state to prevent unnecessary fetches
-  let previousProjectId: string | null = null;
-  let previousOpenState = false;
-  let fetchInProgress = false;
-  
-  // Function to safely trigger the fetch
-  function triggerFetch() {
-    if (fetchInProgress) {
-      console.log('Fetch already in progress, skipping');
-      return;
-    }
-    
-    if (!open || !projectId) {
-      console.log('Sidebar closed or no project ID, skipping fetch');
-      return;
-    }
-    
-    console.log('AI Sidebar: Triggering fetch for project', projectId);
-    fetchInProgress = true;
-    
-    // Use setTimeout to ensure this runs after the current execution context
-    setTimeout(() => {
-      fetchLatestConversation().finally(() => {
-        fetchInProgress = false;
-      });
-    }, 0);
-  }
-  
-  $: if (open && projectId && (projectId !== previousProjectId || open !== previousOpenState)) {
-    // Only fetch when projectId or open state actually changes
-    console.log('AI Sidebar: State changed, preparing to fetch for project', projectId);
-    previousProjectId = projectId;
-    previousOpenState = open;
-    triggerFetch();
+  $: if (open && projectId) {
+    fetchLatestConversation();
   }
 </script>
 
@@ -179,10 +90,7 @@
   <div class="flex-1 overflow-hidden">
     {#if isLoading}
       <div class="flex items-center justify-center h-full">
-        <div class="flex flex-col items-center space-y-2">
-          <div class="w-8 h-8 border-4 border-t-primary border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
-          <p class="text-sm text-muted-foreground">Loading conversation...</p>
-        </div>
+        <p class="text-sm text-muted-foreground">Loading conversation...</p>
       </div>
     {:else if error}
       <div class="flex items-center justify-center h-full p-4">
@@ -190,11 +98,7 @@
           <p class="text-sm">Error: {error}</p>
           <button 
             class="mt-2 text-xs underline"
-            on:click={() => {
-              // Reset error state and trigger a new fetch
-              error = null;
-              triggerFetch();
-            }}
+            on:click={fetchLatestConversation}
           >
             Try again
           </button>
