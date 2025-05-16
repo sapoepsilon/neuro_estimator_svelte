@@ -988,7 +988,7 @@
       {/if}
     </div>
   </div>
-  <div class="grid-container flex-1 bg-white rounded-md overflow-hidden">
+  <div class="grid-container flex-1 bg-white rounded-md overflow-hidden mobile-grid-container">
     <RevoGrid
       source={gridSource} 
       columns={gridColumns}

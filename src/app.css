@@ -104,6 +104,39 @@
   overflow: hidden; /* Prevent container scrolling */
 }
 
+/* Mobile-specific styles to ensure only the grid scrolls */
+@media (max-width: 768px) {
+  .grid-container {
+    height: calc(100vh - 150px); /* Slightly more space on mobile */
+    overflow: visible; /* Allow the grid to handle its own scrolling */
+  }
+  
+  /* Prevent scrolling on main containers */
+  body, html {
+    overflow: hidden;
+    height: 100%;
+    position: fixed;
+    width: 100%;
+  }
+  
+  /* Allow only the grid viewport to scroll */
+  .grid-container .rgViewport {
+    overflow-y: auto !important;
+  }
+  
+  /* Specific styles for our mobile grid container */
+  .mobile-grid-container {
+    position: relative;
+    z-index: 10; /* Ensure grid is above other elements */
+    max-height: calc(100vh - 150px);
+  }
+  
+  /* Ensure the grid takes available space */
+  .mobile-grid-container revo-grid {
+    max-height: 100%;
+  }
+}
+
 /* Override RevoGrid's default height settings */
 .grid-container revo-grid {
   height: 100% !important;
