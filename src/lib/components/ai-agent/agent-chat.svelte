@@ -621,14 +621,6 @@
   
   <!-- Message Input -->
   <div class="p-4 border-t">
-    {#if isApiLoading}
-      <div class="flex justify-center mb-2">
-        <div class="flex items-center space-x-2 text-primary">
-          <Loader2 class="h-5 w-5 animate-spin" />
-          <span class="text-sm">Processing your request...</span>
-        </div>
-      </div>
-    {/if}
     <div class="relative">
       <input
         type="text"

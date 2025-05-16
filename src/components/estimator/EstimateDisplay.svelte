@@ -824,16 +824,18 @@
 {#if gridSource.length > 0}
   <div class="bg-white rounded-md shadow mb-4 flex flex-col">
     <div class="p-3 sm:p-4 bg-slate-50 rounded-t-md border-b">
-      <!-- Desktop layout -->
-      <div class="hidden sm:flex flex-row justify-between gap-4">
-        <div class="flex-1">
-          <h4 class="font-medium">{result.estimate?.title || 'Project Estimate'}</h4>
-          <p class="text-sm text-slate-500">Currency: {result.estimate?.currency || 'USD'}</p>
+      <!-- Desktop layout - Optimized for better space utilization -->
+      <div class="hidden sm:flex items-center justify-between gap-4 w-full">
+        <div class="flex items-center gap-4 flex-grow">
+          <div>
+            <h4 class="font-medium">{result.estimate?.title || 'Project Estimate'}</h4>
+            <p class="text-sm text-slate-500">Currency: {result.estimate?.currency || 'USD'}</p>
+          </div>
+          <div class="ml-auto flex items-center">
+            <p class="text-lg font-semibold">{result.estimate?.totalAmount || 0} {result.estimate?.currency || 'USD'}</p>
+          </div>
         </div>
-        <div class="text-right">
-          <p class="text-lg font-semibold">{result.estimate?.totalAmount || 0} {result.estimate?.currency || 'USD'}</p>
-        </div>
-        <div class="flex flex-col gap-2 justify-end">
+        <div class="flex items-center gap-2 shrink-0">
           <button 
             on:click={exportToExcel} 
             class="bg-green-500 hover:bg-green-600 active:bg-green-700 text-white px-3 py-2 rounded-md text-sm font-medium flex items-center justify-center shadow-sm transition-colors"
