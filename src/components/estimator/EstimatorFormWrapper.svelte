@@ -251,7 +251,7 @@
         class="fixed bottom-6 right-6 flex flex-col items-end space-y-2 z-[999] transition-opacity duration-300" 
         style="pointer-events: auto; {isAiSidebarVisible ? 'opacity: 0; visibility: hidden;' : 'opacity: 1; visibility: visible;'}"
       >
-        <div class="bg-white dark:bg-gray-800 text-xs text-gray-500 dark:text-gray-400 p-2 rounded-md shadow-md flex items-center mb-2">
+        <div class="hidden md:block bg-white dark:bg-gray-800 text-xs text-gray-500 dark:text-gray-400 p-2 rounded-md shadow-md flex items-center mb-2">
           <Keyboard class="h-3 w-3 mr-1" />
           <span>Ctrl+K</span>
         </div>

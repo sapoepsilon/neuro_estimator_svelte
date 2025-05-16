@@ -189,12 +189,12 @@
 </script>
 
 <div class="container mx-auto py-8 px-4 max-w-full">
-  <Card class="w-full max-w-3xl mx-auto">
+  <Card class="w-full max-w-3xl mx-auto max-h-[80vh] overflow-hidden flex flex-col">
     <CardHeader>
       <CardTitle class="text-2xl font-bold">Project Estimator</CardTitle>
       <CardDescription>Fill in the details to generate a project estimate</CardDescription>
     </CardHeader>
-    <CardContent>
+    <CardContent class="overflow-y-auto flex-1">
         <form on:submit|preventDefault={handleSubmit}>
           <div class="space-y-6">
             <div>
@@ -263,7 +263,7 @@
             <Button 
               type="submit" 
               disabled={loading}
-              class="w-full"
+              class="w-full mb-4"
             >
               {loading ? 'Generating Estimate...' : 'Generate Estimate'}
             </Button>
