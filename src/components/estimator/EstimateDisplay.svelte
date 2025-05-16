@@ -61,6 +61,41 @@
     if (projectId && !result) {
       loadProjectData(projectId);
     }
+    
+    // Improve mobile touch handling
+    if (typeof window !== 'undefined') {
+      const isMobile = window.matchMedia('(max-width: 640px)').matches;
+      
+      if (isMobile) {
+        // Add a small delay to handle touch events better
+        setTimeout(() => {
+          const gridContainer = document.querySelector('.grid-container');
+          if (gridContainer) {
+            // Prevent default touch behavior that might cause focus issues
+            gridContainer.addEventListener('touchmove', (e) => {
+              const target = e.target as HTMLElement;
+              if (target && target.closest && target.closest('.revogr-cell')) {
+                e.stopPropagation();
+              }
+            }, { passive: true });
+            
+            // Ensure cells maintain focus on touch
+            gridContainer.addEventListener('touchend', (e) => {
+              const target = e.target as HTMLElement;
+              if (target && target.closest) {
+                const cell = target.closest('.revogr-cell') as HTMLElement;
+                if (cell) {
+                  // Small delay to ensure the touch event completes
+                  setTimeout(() => {
+                    cell.click();
+                  }, 10);
+                }
+              }
+            }, { passive: true });
+          }
+        }, 500);
+      }
+    }
   });
   
   $: if (result && result.estimate && result.estimate.lineItems) {
@@ -714,61 +749,155 @@
   .grid-container {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 16rem); /* Adjust based on your layout */
-    min-height: 400px;
     width: 100%;
+    height: auto;
+  }
+  
+  /* Responsive grid height */
+  @media (max-width: 640px) {
+    .grid-container {
+      height: 500px;
+      min-height: 300px;
+      max-height: 70vh;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+    }
+    
+    /* Improve mobile grid behavior */
+    :global(.grid-container > .revogr-holder) {
+      overflow: visible !important;
+      touch-action: manipulation; /* Improve touch handling */
+    }
+    
+    /* Prevent focus loss on touch */
+    :global(.revogr-focus) {
+      outline: 2px solid #4299e1 !important;
+      outline-offset: -2px;
+      z-index: 5 !important;
+    }
+    
+    /* Improve touch targets for better usability */
+    :global(.revogr-cell) {
+      min-height: 44px !important; /* Minimum touch target size */
+    }
+  }
+  
+  @media (min-width: 641px) {
+    .grid-container {
+      height: 700px; /* Fixed height to enable scrolling */
+      min-height: 600px;
+      max-height: 90vh; /* Limit maximum height */
+      overflow-y: auto; /* Enable vertical scrolling */
+      padding-bottom: 50px; /* Add some padding at the bottom */
+    }
   }
   
   /* Ensure RevoGrid takes full height of its container */
   :global(.grid-container > .revogr-holder) {
     flex: 1;
     height: 100% !important;
+    position: relative;
+  }
+  
+  /* Fix horizontal scrollbar position */
+  :global(.revogr-horizontal-scrollable) {
+    position: sticky !important;
+    bottom: 0 !important;
+    z-index: 10 !important;
+    background-color: white;
+  }
+  
+  /* Mobile horizontal scrollbar adjustments */
+  @media (max-width: 640px) {
+    :global(.revogr-horizontal-scrollable) {
+      position: relative !important;
+      bottom: auto !important;
+    }
   }
   
   :global(.revo-dropdown-list .selected) {
     background-color: #4299e1 !important;
     color: white !important;
   }
-  
-  :global(.grid-container) {
-    height: 500px;
-    width: 100%;
-  }
 </style>
 
 {#if gridSource.length > 0}
   <div class="bg-white rounded-md shadow mb-4 flex flex-col">
-    <div class="p-4 bg-slate-50 rounded-t-md border-b">
-      <div class="flex justify-between items-center">
-        <div>
+    <div class="p-3 sm:p-4 bg-slate-50 rounded-t-md border-b">
+      <!-- Desktop layout -->
+      <div class="hidden sm:flex flex-row justify-between gap-4">
+        <div class="flex-1">
           <h4 class="font-medium">{result.estimate?.title || 'Project Estimate'}</h4>
           <p class="text-sm text-slate-500">Currency: {result.estimate?.currency || 'USD'}</p>
         </div>
         <div class="text-right">
           <p class="text-lg font-semibold">{result.estimate?.totalAmount || 0} {result.estimate?.currency || 'USD'}</p>
         </div>
-         <div class="mt-4 flex flex-col sm:flex-row justify-end sm:space-x-2 space-y-2 sm:space-y-0">
-        <button 
-          on:click={exportToExcel} 
-          class="bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-md text-sm flex items-center justify-center"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-          </svg>
-          <span class="whitespace-nowrap">Export Excel</span>
-        </button>
-        <button 
-          on:click={toggleNewItemForm} 
-          class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-md text-sm flex items-center justify-center"
-        >
-          {#if !showNewItemForm}
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+        <div class="flex flex-col gap-2 justify-end">
+          <button 
+            on:click={exportToExcel} 
+            class="bg-green-500 hover:bg-green-600 active:bg-green-700 text-white px-3 py-2 rounded-md text-sm font-medium flex items-center justify-center shadow-sm transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
-          {/if}
-          <span class="whitespace-nowrap">{showNewItemForm ? 'Cancel' : 'Add Item'}</span>
-        </button>
+            <span class="whitespace-nowrap">Export</span>
+          </button>
+          <button 
+            on:click={toggleNewItemForm} 
+            class="bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white px-3 py-2 rounded-md text-sm font-medium flex items-center justify-center shadow-sm transition-colors"
+          >
+            {#if !showNewItemForm}
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+              </svg>
+            {:else}
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            {/if}
+            <span class="whitespace-nowrap">{showNewItemForm ? 'Cancel' : 'Add'}</span>
+          </button>
+        </div>
       </div>
+      
+      <!-- Mobile layout -->
+      <div class="sm:hidden">
+        <div class="flex justify-between items-center">
+          <div>
+            <h4 class="font-medium">{result.estimate?.title || 'Project Estimate'}</h4>
+            <div class="flex items-center gap-2 mt-0.5">
+              <span class="text-xs text-slate-500">{result.estimate?.currency || 'USD'}</span>
+              <span class="text-base font-semibold">{result.estimate?.totalAmount || 0}</span>
+            </div>
+          </div>
+          <div class="flex gap-1">
+            <button 
+              on:click={exportToExcel} 
+              class="bg-green-500 hover:bg-green-600 active:bg-green-700 text-white p-1.5 rounded-md flex items-center justify-center shadow-sm"
+              aria-label="Export as Excel"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+            </button>
+            <button 
+              on:click={toggleNewItemForm} 
+              class="bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white p-1.5 rounded-md flex items-center justify-center shadow-sm"
+              aria-label="{showNewItemForm ? 'Cancel' : 'Add new item'}"
+            >
+              {#if !showNewItemForm}
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+              {:else}
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              {/if}
+            </button>
+          </div>
+        </div>
       </div>
      
       
@@ -857,7 +986,7 @@
       {/if}
     </div>
   </div>
-  <div class="grid-container flex-1">
+  <div class="grid-container flex-1 bg-white rounded-md overflow-hidden">
     <RevoGrid
       source={gridSource} 
       columns={gridColumns}

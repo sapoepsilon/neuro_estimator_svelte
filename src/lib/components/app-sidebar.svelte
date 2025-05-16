@@ -66,6 +66,8 @@
     const unsubscribe = user.subscribe(async currentUser => {
       if (currentUser) {
         projects = await getProjects();
+      } else {
+        projects = [];
       }
     });
     
@@ -73,6 +75,16 @@
       unsubscribe();
     };
   })
+  
+  // Watch for sidebar visibility changes to ensure projects are loaded when sidebar opens
+  $: if (sidebarVisible && $user) {
+    // Use a small timeout to ensure this runs after the sidebar animation starts
+    setTimeout(async () => {
+      if (projects.length === 0) {
+        projects = await getProjects();
+      }
+    }, 50);
+  }
   
   // Navigation items
   const navItems = [
@@ -83,16 +95,16 @@
     }
   ];
   
-  // Check if device is mobile
   function checkMobile() {
+    const wasMobile = isMobile;
     isMobile = window.innerWidth < 768;
-    // On mobile, sidebar should NOT be collapsed (to show text)
     if (isMobile) {
       collapsed = false;
-      // But it should be hidden by default
-      if (!sidebarVisible) {
+      if (!wasMobile && isMobile) {
         sidebarVisible = false;
       }
+    } else if (wasMobile && !isMobile) {
+      sidebarVisible = true;
     }
   }
   
@@ -105,9 +117,17 @@
     }
   }
   
-  function toggleSidebar() {
+  async function toggleSidebar() {
     if (isMobile) {
       sidebarVisible = !sidebarVisible;
+      if (sidebarVisible) {
+        document.body.style.overflow = 'hidden';
+        if ($user && projects.length === 0) {
+          projects = await getProjects();
+        }
+      } else {
+        document.body.style.overflow = '';
+      }
     } else {
       collapsed = !collapsed;
       widthPx = collapsed ? 64 : 250;
@@ -211,6 +231,42 @@
     checkMobile();
     window.addEventListener('resize', checkMobile);
     
+    // Add escape key listener for closing sidebar on mobile
+    const handleEscKey = (e) => {
+      if (e.key === 'Escape' && isMobile && sidebarVisible) {
+        sidebarVisible = false;
+        document.body.style.overflow = '';
+      }
+    };
+    
+    window.addEventListener('keydown', handleEscKey);
+    
+    // Add swipe detection for mobile
+    let touchStartX = 0;
+    let touchEndX = 0;
+    
+    const handleTouchStart = (e) => {
+      touchStartX = e.changedTouches[0].screenX;
+    };
+    
+    const handleTouchEnd = (e) => {
+      touchEndX = e.changedTouches[0].screenX;
+      handleSwipe();
+    };
+    
+    const handleSwipe = () => {
+      // Detect left swipe to close sidebar
+      if (isMobile && sidebarVisible && touchEndX < touchStartX - 50) {
+        sidebarVisible = false;
+        document.body.style.overflow = '';
+      }
+    };
+    
+    if (isBrowser()) {
+      document.addEventListener('touchstart', handleTouchStart, { passive: true });
+      document.addEventListener('touchend', handleTouchEnd, { passive: true });
+    }
+    
     // Load saved width from localStorage on mount
     if (isBrowser() && !initialWidthLoaded) {
       try {
@@ -227,6 +283,13 @@
     
     return () => {
       window.removeEventListener('resize', checkMobile);
+      window.removeEventListener('keydown', handleEscKey);
+      
+      if (isBrowser()) {
+        document.removeEventListener('touchstart', handleTouchStart);
+        document.removeEventListener('touchend', handleTouchEnd);
+      }
+      
       // Clean up resize listeners if component is destroyed while resizing
       window.removeEventListener('mousemove', handleResize);
       window.removeEventListener('mouseup', stopResize);
@@ -235,24 +298,28 @@
       if (animationFrameId !== null) {
         cancelAnimationFrame(animationFrameId);
       }
+      
+      // Restore body overflow
+      document.body.style.overflow = '';
     };
   });
 </script>
 
 <!-- Mobile overlay to close sidebar when clicking outside -->
 {#if isMobile && sidebarVisible}
-  <button 
-    class="fixed inset-0 bg-black/20 z-30 border-0" 
+  <div 
+    class="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 transition-opacity duration-300 ease-in-out"
     on:click={() => sidebarVisible = false}
     on:keydown={(e) => e.key === 'Escape' && (sidebarVisible = false)}
+    role="button"
+    tabindex="-1"
     aria-label="Close sidebar"
-  ></button>
+  ></div>
 {/if}
 
 <div 
-  class="h-full flex flex-col border-r bg-background {isResizing ? '' : 'transition-all duration-300 ease-in-out'} {isMobile ? 'fixed z-40 left-0 top-0 bottom-0' : ''} relative" 
-  style="{isMobile ? 'width: 250px' : `width: ${width}; min-width: ${width}; max-width: ${width};`}"
-  class:hidden={isMobile && !sidebarVisible}
+  class="h-full flex flex-col border-r bg-background shadow-lg {isResizing ? '' : 'transition-all duration-300 ease-in-out'} {isMobile ? 'fixed z-50 top-0 bottom-0 max-h-screen overflow-hidden' : 'relative'}"
+  style="{isMobile ? `width: 280px; transform: translateX(${sidebarVisible ? '0' : '-100%'})` : `width: ${width}; min-width: ${width}; max-width: ${width};`}"
 >
   
   <!-- Full-height resize handle (only visible when not collapsed and not on mobile) -->

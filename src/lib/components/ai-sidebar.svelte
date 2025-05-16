@@ -14,6 +14,8 @@
   
   function close() {
     open = false;
+    // Dispatch event to notify that the sidebar has been closed
+    window.dispatchEvent(new CustomEvent('aiSidebarClosed'));
   }
   
   async function fetchLatestConversation() {
@@ -66,19 +68,19 @@
 </script>
 
 <div 
-  class="h-full flex flex-col border-l bg-background transition-all duration-300 ease-in-out fixed z-40 right-0 top-0 bottom-0 w-[350px]" 
+  class="h-full flex flex-col border-l bg-background transition-all duration-300 ease-in-out fixed z-40 right-0 top-0 bottom-0 w-[90vw] sm:w-[350px] max-w-[350px]" 
   class:translate-x-full={!open}
   class:translate-x-0={open}
 >
-  <div class="p-4 border-b flex items-center justify-between">
+  <div class="p-3 sm:p-4 border-b flex items-center justify-between">
     <div class="flex items-center gap-2">
       <MessageSquare class="h-5 w-5" />
-      <h2 class="text-lg font-semibold">AI Estimating Agent</h2>
+      <h2 class="text-lg font-semibold truncate">AI Estimating Agent</h2>
     </div>
     <div class="flex items-center gap-2">
-      <div class="text-sm text-muted-foreground">{projectName || 'New Project'}</div>
+      <div class="text-sm text-muted-foreground max-w-[100px] sm:max-w-[150px] truncate">{projectName || 'New Project'}</div>
       <button 
-        class="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800" 
+        class="p-1.5 rounded-md hover:bg-slate-100 active:bg-slate-200 dark:hover:bg-slate-800" 
         on:click={close}
         aria-label="Close AI sidebar"
       >
@@ -126,7 +128,7 @@
 
 {#if open}
   <div 
-    class="fixed inset-0 bg-black/20 z-30 md:hidden" 
+    class="fixed inset-0 bg-black/40 backdrop-blur-sm z-30 md:hidden" 
     on:click={close}
     on:keydown={(e) => e.key === 'Escape' && close()}
     role="button"
@@ -134,3 +136,5 @@
     aria-label="Close AI sidebar"
   ></div>
 {/if}
+
+<svelte:window on:keydown={(e) => e.key === 'Escape' && open && close()} />
