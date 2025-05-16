@@ -188,13 +188,13 @@
   }
 </script>
 
-<div class="container mx-auto py-8 px-4 max-w-full overflow-auto" style="max-height: 90vh;">
-  <Card class="w-full max-w-3xl mx-auto overflow-auto">
+<div class="container mx-auto py-8 px-4 max-w-full">
+  <Card class="w-full max-w-3xl mx-auto">
     <CardHeader>
       <CardTitle class="text-2xl font-bold">Project Estimator</CardTitle>
       <CardDescription>Fill in the details to generate a project estimate</CardDescription>
     </CardHeader>
-    <CardContent class="overflow-y-auto">
+    <CardContent>
         <form on:submit|preventDefault={handleSubmit}>
           <div class="space-y-6">
             <div>
