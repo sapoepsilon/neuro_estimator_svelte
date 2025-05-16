@@ -96,7 +96,7 @@
             <div class="absolute h-full w-1 bg-red-500 left-[18%] z-10 shadow-md"></div>
           </div>
           <div class="flex justify-between text-xs text-gray-600 mt-2 font-medium">
-            <span>Apr 2025</span>
+            <span>May 2025</span>
             <span>May 2025</span>
             <span>Jun 2025</span>
             <span>Jul 2025</span>

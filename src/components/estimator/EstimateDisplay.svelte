@@ -747,26 +747,26 @@
         <div class="text-right">
           <p class="text-lg font-semibold">{result.estimate?.totalAmount || 0} {result.estimate?.currency || 'USD'}</p>
         </div>
-         <div class="mt-4 flex justify-end space-x-2">
+         <div class="mt-4 flex flex-col sm:flex-row justify-end sm:space-x-2 space-y-2 sm:space-y-0">
         <button 
           on:click={exportToExcel} 
-          class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md text-sm flex items-center"
+          class="bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-md text-sm flex items-center justify-center"
         >
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
-          Export as Excel
+          <span class="whitespace-nowrap">Export Excel</span>
         </button>
         <button 
           on:click={toggleNewItemForm} 
-          class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm flex items-center"
+          class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-md text-sm flex items-center justify-center"
         >
           {#if !showNewItemForm}
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
             </svg>
           {/if}
-          {showNewItemForm ? 'Cancel' : 'Add New Item'}
+          <span class="whitespace-nowrap">{showNewItemForm ? 'Cancel' : 'Add Item'}</span>
         </button>
       </div>
       </div>

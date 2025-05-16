@@ -629,14 +629,14 @@
         </div>
       </div>
     {/if}
-    <div class="flex-1 relative">
+    <div class="relative">
       <input
         type="text"
-        class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+        class="w-full p-2 pr-10 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
         placeholder="Type your message..."
         bind:value={newMessage}
         on:keydown={handleKeydown}
-        on:input={(e) => {
+          on:input={(e) => {
           // If a range selection was completed, don't show suggestions until a new @ is typed
           if (rangeSelectionComplete) {
             // Check if the current character at cursor position is @
@@ -781,17 +781,17 @@
           {/if}
         </div>
       {/if}
-      <button 
-        class="p-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
-        on:click={sendMessage}
-        disabled={!newMessage.trim() || isApiLoading}
-      >
-        {#if isApiLoading}
-          <Loader2 class="h-5 w-5 animate-spin" />
-        {:else}
-          <Send class="h-5 w-5" />
-        {/if}
-      </button>
+        <button 
+          class="absolute right-2 top-1/2 transform -translate-y-1/2 inline-flex items-center justify-center h-8 w-8 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
+          on:click={sendMessage}
+          disabled={!newMessage.trim() || isApiLoading}
+        >
+          {#if isApiLoading}
+            <Loader2 class="h-5 w-5 animate-spin" />
+          {:else}
+            <Send class="h-5 w-5" />
+          {/if}
+        </button>
     </div>
   </div>
 </div>
