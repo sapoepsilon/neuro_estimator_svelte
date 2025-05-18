@@ -6,6 +6,8 @@
   import * as XLSX from 'xlsx';
   import { user } from '../../stores/authStore';
   import { gridData, currentProjectId } from '../../stores/gridStore';
+  import { columnConfigurations, loadColumnConfigurations, addCustomColumn, renameCustomColumn, deleteCustomColumn, getGridColumns } from '../../stores/columnStore';
+  import ColumnManager from './ColumnManager.svelte';
   import { toast } from "svelte-sonner";
 
   export let result: any = null;
@@ -13,6 +15,7 @@
   let gridSource: any[] = [];
   let gridColumns: any[] = [];
   let showNewItemForm = false;
+  let showColumnManager = false;
   let newItem = {
     description: '',
     quantity: 1,
@@ -62,6 +65,11 @@
       loadProjectData(projectId);
     }
     
+    // Load column configurations
+    if (projectId && $user) {
+      loadColumnConfigurations(projectId, $user.id);
+    }
+    
     // Improve mobile touch handling
     if (typeof window !== 'undefined') {
       const isMobile = window.matchMedia('(max-width: 640px)').matches;
@@ -102,6 +110,12 @@
     prepareGridData(result);
   }
   
+  // Also update grid when column configurations change
+  $: if ($columnConfigurations && result) {
+    console.log('Column configurations changed, updating grid:', $columnConfigurations);
+    prepareGridData(result);
+  }
+  
   // Track previous projectId to prevent unnecessary reloads
   let previousProjectId: string | null = null;
   
@@ -129,10 +143,10 @@
       if (projectError) throw projectError;
       console.log('Project data loaded:', projectData);
       
-      // Fetch the estimate items for this project
+      // Fetch the estimate items for this project, including the data field for custom columns
       const { data: estimateItems, error: itemsError } = await supabase
         .from('estimate_items')
-        .select('*')
+        .select('*, data')
         .eq('project_id', id)
         .order('created_at', { ascending: true });
       
@@ -146,8 +160,10 @@
           description: projectData.description,
           currency: 'USD',
           lineItems: estimateItems.map(item => {
-            console.log('Processing item with ID:', item.id);
-            return {
+            console.log('Processing item with ID:', item.id, 'with data:', item.data);
+            
+            // Create the base item with TypeScript-safe properties
+            const lineItem: any = {
               id: item.id,
               description: item.title,
               quantity: item.quantity,
@@ -157,6 +173,32 @@
               amount: item.amount,
               subItems: []
             };
+            
+            // Add the data field for custom columns
+            if (item.data) {
+              // Store the data field
+              lineItem.data = item.data;
+              
+              // Also add each custom field directly to the line item
+              // so it's accessible in the grid
+              let dataObj = item.data;
+              if (typeof dataObj === 'string') {
+                try {
+                  dataObj = JSON.parse(dataObj);
+                } catch (e) {
+                  console.error('Error parsing data JSON:', e);
+                }
+              }
+              
+              if (typeof dataObj === 'object' && dataObj !== null) {
+                console.log('Adding custom fields to line item:', dataObj);
+                Object.entries(dataObj).forEach(([key, value]) => {
+                  lineItem[key] = value;
+                });
+              }
+            }
+            
+            return lineItem;
           }),
           totalAmount: estimateItems.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0)
         }
@@ -175,6 +217,13 @@
   export function refreshData() {
     console.log('Refreshing data for project ID:', projectId);
     if (projectId) {
+      // Also reload column configurations
+      if ($user) {
+        console.log('Reloading column configurations for user:', $user.id);
+        loadColumnConfigurations(projectId, $user.id).then(columns => {
+          console.log('Updated column configurations:', columns);
+        });
+      }
       loadProjectData(projectId);
     }
   }
@@ -185,132 +234,20 @@
     
     if (!data.estimate || !data.estimate.lineItems) return;
     
-    // Define default column settings
-    const defaultColumns: ColumnRegular[] = [
-      { 
-        prop: 'description', 
-        name: 'Description', 
-        size: 250, 
-        minSize: 200, 
-        maxSize: 500,
-        sortable: true,
-        filter: true,
-        editor: true,
-        readonly: (props) => props.model.isTotal || props.model.isSubItem
-      },
-      { 
-        prop: 'quantity', 
-        name: 'Quantity', 
-        size: 100, 
-        minSize: 80, 
-        maxSize: 150,
-        sortable: true,
-        filter: true,
-        columnType: 'numeric',
-        editor: 'number',
-        readonly: (props) => props.model.isTotal || props.model.isSubItem
-      },
-      { 
-        prop: 'unitType', 
-        name: 'Unit Type', 
-        size: 100, 
-        minSize: 80, 
-        maxSize: 150,
-        sortable: true,
-        filter: true,
-        editor: 'select',
-        editorSource: [
-          { label: 'Hour', value: 'hour' },
-          { label: 'Day', value: 'day' },
-          { label: 'Unit', value: 'unit' },
-          { label: 'Square Foot', value: 'sq-ft' },
-          { label: 'Board Foot', value: 'board-ft' },
-          { label: 'Package', value: 'package' },
-          { label: 'Linear Foot', value: 'linear-ft' }
-        ],
-        readonly: (props) => props.model.isTotal || props.model.isSubItem
-      },
-      { 
-        prop: 'costType', 
-        name: 'Cost Type', 
-        size: 100, 
-        minSize: 80, 
-        maxSize: 150,
-        sortable: true,
-        filter: true,
-        editor: 'select',
-        editorSource: [
-          { label: 'Material', value: 'material' },
-          { label: 'Labor', value: 'labor' },
-          { label: 'Equipment', value: 'equipment' },
-          { label: 'Subcontractor', value: 'subcontractor' },
-          { label: 'Other', value: 'other' }
-        ],
-        readonly: (props) => props.model.isTotal || props.model.isSubItem
-      },
-      { 
-        prop: 'unitPrice', 
-        name: 'Unit Price', 
-        size: 120, 
-        minSize: 100, 
-        maxSize: 200,
-        sortable: true,
-        filter: true,
-        columnType: 'numeric',
-        editor: 'number',
-        readonly: (props) => props.model.isTotal || props.model.isSubItem
-      },
-      { 
-        prop: 'amount', 
-        name: 'Amount', 
-        size: 120, 
-        minSize: 100, 
-        maxSize: 200,
-        sortable: true,
-        filter: true,
-        columnType: 'numeric',
-        readonly: true
-      },
-      {
-        prop: 'actions',
-        name: 'Actions',
-        size: 100,
-        minSize: 80,
-        maxSize: 120,
-        cellTemplate: (h, props) => {
-          // Don't show delete button for total row
-          if (props.model.isTotal) {
-            return h('div', {}, '');
-          }
-          return h(
-            'button',
-            {
-              style: {
-                background: 'none',
-                border: 'none',
-                color: 'red',
-                cursor: 'pointer',
-                padding: '4px 8px',
-                borderRadius: '4px',
-                fontSize: '12px'
-              },
-              onClick: () => {
-                handleDeleteItem(props.model);
-              }
-            },
-            'Delete'
-          );
-        }
-      },
-    ];
+    // Use column configurations from the store
+    gridColumns = getGridColumns($columnConfigurations, {
+      handleDeleteItem,
+      handleCellEdit
+    });
     
-    // Apply saved column widths if available, otherwise use defaults
-    gridColumns = applySavedColumnWidths(defaultColumns);
+    // Apply saved column widths if available
+    gridColumns = applySavedColumnWidths(gridColumns);
     
     const flattenedItems = [];
     
     data.estimate.lineItems.forEach((item, index) => {
-      flattenedItems.push({
+      // Create the base item with standard fields
+      const itemData = {
         id: item.id, // Use the actual database ID directly
         description: item.description,
         quantity: item.quantity,
@@ -319,7 +256,33 @@
         unitPrice: item.unitPrice,
         amount: item.amount,
         isHeader: true
-      });
+      };
+      
+      // Add custom fields from data JSON
+      if (item.data) {
+        let dataObj = item.data;
+        
+        // Handle string JSON if needed
+        if (typeof item.data === 'string') {
+          try {
+            dataObj = JSON.parse(item.data);
+          } catch (e) {
+            console.error('Error parsing item data JSON:', e);
+            dataObj = {};
+          }
+        }
+        
+        // Add all custom fields from the data object
+        if (typeof dataObj === 'object' && dataObj !== null) {
+          console.log(`Adding custom fields for item ${item.id} from data:`, dataObj);
+          Object.entries(dataObj).forEach(([key, value]) => {
+            console.log(`Setting custom field ${key} = ${value}`);
+            itemData[key] = value;
+          });
+        }
+      }
+      
+      flattenedItems.push(itemData);
       
       if (item.subItems && item.subItems.length > 0) {
         item.subItems.forEach((subItem, subIndex) => {
@@ -517,9 +480,38 @@
   }
 
   // Handle cell edit event
+  // Handle column saved event from ColumnManager
+  function handleColumnSaved(event) {
+    console.log('Column saved event received:', event.detail);
+    // The column manager already called the appropriate function
+    refreshData();
+  }
+  
+  // Handle column deleted event from ColumnManager
+  function handleColumnDeleted(event) {
+    console.log('Column deleted event received:', event.detail);
+    // The column manager already called deleteCustomColumn
+    refreshData();
+  }
+  
+  // Handle columns loaded event from ColumnManager
+  function handleColumnsLoaded(event) {
+    console.log('Columns loaded event received:', event.detail);
+    // Update the column configurations store
+    columnConfigurations.set(event.detail);
+    // Refresh the grid with the new columns
+    if (result) {
+      prepareGridData(result);
+    }
+  }
+
   async function handleCellEdit(editEvent) {
+    // Add an alert to confirm function is being called
+    alert('Cell edit detected!');
+    
     try {
       console.log(`handleCellEdit: ${JSON.stringify(editEvent)}`);
+      console.log('Edit event details:', editEvent);
       
       // Extract the edited cell data - RevoGrid uses a different structure
       const { prop, model, val, value: oldVal, rowIndex } = editEvent;
@@ -606,31 +598,116 @@
       };
       
       // Prepare data for database update
-      const updateData: Record<string, any> = {};
+      const updateData: { [key: string]: any } = {
+        [prop]: val
+      };
       
-      // Handle different data types appropriately
+      // If quantity or unit price changed, recalculate amount
       if (prop === 'quantity' || prop === 'unitPrice') {
-        // Make sure we're sending a number to the database
-        const numValue = typeof val === 'string' ? parseFloat(val) : val;
-        updateData[propToColumnMap[prop]] = isNaN(numValue) ? 0 : numValue;
-      } else {
-        updateData[propToColumnMap[prop] || prop] = val;
+        const quantity = prop === 'quantity' ? val : (model as any).quantity;
+        const unitPrice = prop === 'unitPrice' ? val : (model as any).unitPrice;
+        updateData.amount = quantity * unitPrice;
+        (model as any).amount = updateData.amount; // Update the model for UI
       }
       
-      // If amount was recalculated, update that too
-      if (prop === 'quantity' || prop === 'unitPrice') {
-        updateData.amount = newAmount;
-        updateData.total_amount = newAmount; // Update total_amount field too
+      // Handle custom column data (store in data JSON field)
+      // Log all properties of the model to see what's available
+      console.log('All model properties:', Object.keys(model));
+      console.log('Model data:', model);
+      
+      // Check if this is a custom column
+      const standardColumns = ['id', 'description', 'quantity', 'unitType', 'costType', 'unitPrice', 'amount', 'actions', 
+                             'title', 'unit_type', 'cost_type', 'currency', 'data'];
+      const isCustomColumn = !standardColumns.includes(prop);
+      console.log('Is custom column?', isCustomColumn, 'Property:', prop);
+      
+      if (isCustomColumn) {
+        console.log('Handling custom column:', prop, 'with value:', val);
+        
+        try {
+          // We'll need to update the data JSON field
+          console.log('Fetching current item data for ID:', (model as any).id);
+          const { data: currentItem, error: fetchError } = await supabase
+            .from('estimate_items')
+            .select('data')
+            .eq('id', (model as any).id)
+            .single();
+          
+          if (fetchError) {
+            console.error('Error fetching current item data:', fetchError);
+            throw fetchError;
+          }
+          
+          console.log('Current item data:', currentItem);
+          
+          // Ensure currentData is a proper object
+          let currentData = {};
+          if (currentItem && currentItem.data) {
+            if (typeof currentItem.data === 'string') {
+              try {
+                currentData = JSON.parse(currentItem.data);
+              } catch (e) {
+                console.error('Error parsing data JSON:', e);
+              }
+            } else if (typeof currentItem.data === 'object') {
+              currentData = currentItem.data;
+            }
+          }
+          
+          console.log('Current data field (processed):', currentData);
+          
+          // Create the updated data object
+          updateData.data = {
+            ...currentData,
+            [prop]: val
+          };
+          
+          console.log('Updated data field:', updateData.data);
+          
+          // Remove the custom property from the direct update
+          delete updateData[prop];
+        } catch (error) {
+          console.error('Error preparing custom column data:', error);
+          toast.error(`Error preparing custom column data: ${error.message}`);
+        }
       }
       
-      console.log('Sending update to database:', { itemId, updateData });
-      
+      // Update the database
       try {
-        // Update the database
+        console.log('Updating database with data:', JSON.stringify(updateData, null, 2));
+        console.log('For item ID:', itemId);
+        
+        // Make sure we're using the correct ID
+        const actualItemId = (model as any).id || itemId;
+        console.log('Using actual item ID:', actualItemId);
+        
+        // If this is a custom column, make sure the data field is properly structured
+        if (isCustomColumn && updateData.data) {
+          console.log('Custom column update data:', updateData.data);
+          
+          // Ensure the data is properly formatted as JSONB
+          if (typeof updateData.data !== 'object') {
+            updateData.data = {};
+            updateData.data[prop] = val;
+          }
+          
+          // Make sure we're not sending a circular structure
+          try {
+            // Test if it can be stringified (will throw on circular references)
+            JSON.stringify(updateData.data);
+          } catch (e) {
+            console.error('Circular reference detected in data:', e);
+            // Create a clean object with just the new property
+            updateData.data = { [prop]: val };
+          }
+          
+          console.log('Final data structure being sent to database:', updateData.data);
+        }
+        
         const { data, error } = await supabase
           .from('estimate_items')
           .update(updateData)
-          .eq('id', itemId)
+          .eq('id', actualItemId)
           .select();
         
         if (error) {
@@ -639,6 +716,56 @@
         }
         
         console.log('Database update successful:', data);
+        
+        // Verify the update by fetching the item again to check if custom column data was saved
+        if (isCustomColumn) {
+          try {
+            console.log('Verifying custom column update...');
+            const { data: verifyData, error: verifyError } = await supabase
+              .from('estimate_items')
+              .select('*')
+              .eq('id', actualItemId)
+              .single();
+              
+            if (verifyError) {
+              console.error('Error verifying update:', verifyError);
+            } else {
+              console.log('Verified data after update:', verifyData);
+              console.log('Custom data field after update:', verifyData.data);
+              
+              // Check if our custom column value was saved
+              if (verifyData.data && verifyData.data[prop] === val) {
+                console.log('✅ Custom column value was saved successfully!');
+                
+                // Immediately update the grid with the new value
+                // Find the item in the grid source and update it
+                const itemIndex = gridSource.findIndex(item => item.id === actualItemId);
+                if (itemIndex !== -1) {
+                  console.log('Updating grid item at index:', itemIndex);
+                  // Update the custom property directly in the grid source
+                  gridSource[itemIndex][prop] = val;
+                  
+                  // Also update the data field
+                  if (!gridSource[itemIndex].data) {
+                    gridSource[itemIndex].data = {};
+                  }
+                  if (typeof gridSource[itemIndex].data === 'object') {
+                    gridSource[itemIndex].data[prop] = val;
+                  }
+                  
+                  // Force grid to update
+                  gridSource = [...gridSource];
+                }
+              } else {
+                console.error('❌ Custom column value was NOT saved correctly!');
+                console.log('Expected:', prop, '=', val);
+                console.log('Actual data:', verifyData.data);
+              }
+            }
+          } catch (verifyErr) {
+            console.error('Exception during verification:', verifyErr);
+          }
+        }
         
         // Show success toast
         toast.success('Item updated successfully');
@@ -650,6 +777,7 @@
         }, 100);
       } catch (dbError) {
         console.error('Database update failed:', dbError);
+        console.error('Error details:', JSON.stringify(dbError, null, 2));
         toast.error(`Database update failed: ${dbError.message || 'Unknown error'}`);
         // Refresh to ensure UI is in sync with database
         refreshData();
@@ -657,7 +785,8 @@
       
     } catch (error) {
       console.error('Error updating item:', error);
-      toast.error('Failed to update item: ' + error.message);
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      toast.error(`Failed to update item: ${error.message}`);
       
       // Refresh data to revert changes in UI
       refreshData();
@@ -821,6 +950,17 @@
   }
 </style>
 
+<ColumnManager 
+  bind:isOpen={showColumnManager}
+  projectId={projectId}
+  columnConfigurations={$columnConfigurations}
+  on:columnSaved={handleColumnSaved}
+  on:columnDeleted={handleColumnDeleted}
+  on:columnsLoaded={handleColumnsLoaded}
+  on:dialogClosed={() => refreshData()}
+  on:close={() => showColumnManager = false}
+/>
+
 {#if gridSource.length > 0}
   <div class="bg-white rounded-md shadow mb-4 flex flex-col">
     <div class="p-3 sm:p-4 bg-slate-50 rounded-t-md border-b">
@@ -846,19 +986,16 @@
             <span class="whitespace-nowrap">Export</span>
           </button>
           <button 
-            on:click={toggleNewItemForm} 
-            class="bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white px-3 py-2 rounded-md text-sm font-medium flex items-center justify-center shadow-sm transition-colors"
+            class="text-sm bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium py-1 px-3 rounded transition-colors" 
+            on:click={() => showNewItemForm = !showNewItemForm}
           >
-            {#if !showNewItemForm}
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-              </svg>
-            {:else}
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            {/if}
-            <span class="whitespace-nowrap">{showNewItemForm ? 'Cancel' : 'Add'}</span>
+            {showNewItemForm ? 'Cancel' : 'Add Item'}
+          </button>
+          <button 
+            class="text-sm bg-purple-50 hover:bg-purple-100 text-purple-700 font-medium py-1 px-3 rounded transition-colors" 
+            on:click={() => showColumnManager = true}
+          >
+            Manage Columns
           </button>
         </div>
       </div>
@@ -884,19 +1021,16 @@
               </svg>
             </button>
             <button 
-              on:click={toggleNewItemForm} 
-              class="bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white p-1.5 rounded-md flex items-center justify-center shadow-sm"
-              aria-label="{showNewItemForm ? 'Cancel' : 'Add new item'}"
+              class="text-sm bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium py-1 px-3 rounded transition-colors" 
+              on:click={() => showNewItemForm = !showNewItemForm}
             >
-              {#if !showNewItemForm}
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                </svg>
-              {:else}
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              {/if}
+              {showNewItemForm ? 'Cancel' : 'Add Item'}
+            </button>
+            <button 
+              class="text-sm bg-purple-50 hover:bg-purple-100 text-purple-700 font-medium py-1 px-3 rounded transition-colors" 
+              on:click={() => showColumnManager = true}
+            >
+              Manage Columns
             </button>
           </div>
         </div>
@@ -994,11 +1128,22 @@
       columns={gridColumns}
       theme="material"
       resize={true}
+      canFocus={true}
+      editors={true}
+      on:beforeedit={(e) => {
+        console.log('Before edit event:', e.detail);
+        // Return true to allow editing
+        return true;
+      }}
       on:aftercolumnresize={(e) => {
         saveColumnWidths(e.detail);
       }}
       on:afteredit={(e) => {
+        console.log('After edit event triggered:', e.detail);
         handleCellEdit(e.detail);
+      }}
+      on:celledit={(e) => {
+        console.log('Cell edit event triggered:', e.detail);
       }}
       autoSizeColumn={true}
       exporting={true}
