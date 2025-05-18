@@ -163,15 +163,23 @@
             console.log('Processing item with ID:', item.id, 'with data:', item.data);
             
             // Create the base item with TypeScript-safe properties
+            // Map database column names to frontend property names
             const lineItem: any = {
               id: item.id,
               description: item.title,
               quantity: item.quantity,
-              unitType: item.unit_type,
-              costType: item.cost_type || 'material',
-              unitPrice: item.unit_price,
+              unitType: item.unit_type,  // Map snake_case to camelCase
+              costType: item.cost_type || 'material',  // Map snake_case to camelCase
+              unitPrice: item.unit_price,  // Map snake_case to camelCase
               amount: item.amount,
               subItems: []
+            };
+            
+            // Store the original database fields as well for reference
+            lineItem._dbFields = {
+              unit_type: item.unit_type,
+              cost_type: item.cost_type,
+              unit_price: item.unit_price
             };
             
             // Add the data field for custom columns
@@ -598,9 +606,20 @@
       };
       
       // Prepare data for database update
-      const updateData: { [key: string]: any } = {
-        [prop]: val
+      const updateData: { [key: string]: any } = {};
+      
+      // Map frontend property names to database column names
+      const propMapping = {
+        'unitPrice': 'unit_price',
+        'unitType': 'unit_type',
+        'costType': 'cost_type'
       };
+      
+      // Use the mapped database column name if available, otherwise use the original prop
+      const dbProp = propMapping[prop] || prop;
+      updateData[dbProp] = val;
+      
+      console.log(`Mapping frontend property '${prop}' to database column '${dbProp}'`);
       
       // If quantity or unit price changed, recalculate amount
       if (prop === 'quantity' || prop === 'unitPrice') {
@@ -1123,6 +1142,20 @@
     </div>
   </div>
   <div class="grid-container flex-1 bg-white rounded-md overflow-hidden mobile-grid-container">
+    <!-- Column management controls -->
+    <div class="p-2 border-b flex items-center justify-between bg-slate-50">
+      <div class="text-sm font-medium">Columns</div>
+      <button 
+        on:click={() => showColumnManager = true}
+        class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded-md text-sm flex items-center gap-1 transition-colors"
+        title="Add new column"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" />
+        </svg>
+        <span>Add Column</span>
+      </button>
+    </div>
     <RevoGrid
       source={gridSource} 
       columns={gridColumns}
@@ -1144,6 +1177,41 @@
       }}
       on:celledit={(e) => {
         console.log('Cell edit event triggered:', e.detail);
+      }}
+      headerTemplate={(h, column) => {
+        // Create a custom header template with a + button
+        const headerEl = document.createElement('div');
+        headerEl.className = 'custom-header flex items-center justify-between w-full px-1';
+        
+        // Add column name
+        const nameEl = document.createElement('span');
+        nameEl.textContent = column.name;
+        nameEl.className = 'truncate';
+        headerEl.appendChild(nameEl);
+        
+        // Add + button at the end of each header
+        const buttonEl = document.createElement('button');
+        buttonEl.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" /></svg>';
+        buttonEl.className = 'add-column-btn ml-1 text-blue-500 hover:text-blue-700 focus:outline-none';
+        buttonEl.title = 'Add column';
+        buttonEl.style.display = 'none'; // Hide by default, show on hover
+        
+        // Show the button when hovering over the header
+        headerEl.addEventListener('mouseenter', () => {
+          buttonEl.style.display = 'block';
+        });
+        headerEl.addEventListener('mouseleave', () => {
+          buttonEl.style.display = 'none';
+        });
+        
+        // Open column manager when clicking the + button
+        buttonEl.addEventListener('click', (e) => {
+          e.stopPropagation(); // Prevent sorting
+          showColumnManager = true;
+        });
+        
+        headerEl.appendChild(buttonEl);
+        return headerEl;
       }}
       autoSizeColumn={true}
       exporting={true}

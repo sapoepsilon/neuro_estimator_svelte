@@ -9,10 +9,13 @@
   import { supabase } from '$lib/supabase';
   // We'll call RPC functions directly
 
-  export let projectId: string | null = null;
-  export let columnConfigurations = [];
   export let isOpen = false;
+  export let onClose = () => {};
+  export let onColumnSaved = () => {};
+  // Use export const for external reference only (not a prop)
+  export const projectId = null;
 
+  export let columnConfigurations = [];
   const dispatch = createEventDispatcher();
 
   let newColumnName = "";
