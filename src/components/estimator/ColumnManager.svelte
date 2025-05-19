@@ -2,6 +2,8 @@
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "$lib/components/ui/dialog";
+  import { Label } from "$lib/components/ui/label";
+  import { Textarea } from "$lib/components/ui/textarea";
   import { createEventDispatcher } from 'svelte';
   import { toast } from "svelte-sonner";
   import { writable } from "svelte/store";
@@ -10,10 +12,10 @@
   // We'll call RPC functions directly
 
   export let isOpen = false;
-  export let onClose = () => {};
-  export let onColumnSaved = () => {};
   // Use export const for external reference only (not a prop)
   export const projectId = null;
+  export const onClose = () => {};
+  export const onColumnSaved = () => {};
 
   export let columnConfigurations = [];
   const dispatch = createEventDispatcher();
@@ -25,6 +27,14 @@
   let isLoading = false;
   let editMode = false;
   let businessId = null;
+  
+  // For dropdown options
+  let dropdownOptions = "";
+  let dropdownOptionsList = [];
+  
+  // For date format
+  let dateFormat = "yyyy-MM-dd";
+  let datePickerType = "date"; // date, datetime-local, etc.
 
   // Column type options
   const columnTypes = [
@@ -113,6 +123,15 @@
     newColumnKey = "";
     editingColumn = null;
     editMode = false;
+    
+    // Reset dropdown options
+    dropdownOptions = "";
+    dropdownOptionsList = [];
+    
+    // Reset date format
+    dateFormat = "yyyy-MM-dd";
+    datePickerType = "date";
+    
     console.log('Form reset, editMode is now:', editMode);
   }
 
@@ -197,30 +216,58 @@
           maxSize: 300,
           sortable: true,
           filter: true,
+          
+          // Add column type specific settings
+          ...(newColumnType === 'date' && {
+            dateFormat: dateFormat,
+            datePickerType: datePickerType
+          }),
           order: 999 // High number to put it at the end
         };
         
-        // Create options array for select type
-        const options = newColumnType === 'select' ? [] : null;
+        // Prepare options for dropdown if applicable
+        let columnOptions = null;
+        if (newColumnType === 'select') {
+          if (dropdownOptionsList.length > 0) {
+            // Convert options to the format expected by the database
+            // Use a slugified version of the option as the value to ensure it's safe for storage
+            columnOptions = dropdownOptionsList.map((option, index) => {
+              // Create a value that's guaranteed to be unique and valid
+              const value = option.toLowerCase().replace(/[^a-z0-9]/g, '_') || `option_${index+1}`;
+              return {
+                label: option,
+                value: value
+              };
+            });
+            console.log('Saving dropdown options:', columnOptions);
+          } else {
+            // Show warning if no options were provided
+            toast.warning('No dropdown options provided. Adding default options.');
+            // Provide some default options
+            columnOptions = [
+              { label: 'Option 1', value: 'option_1' },
+              { label: 'Option 2', value: 'option_2' },
+              { label: 'Option 3', value: 'option_3' }
+            ];
+          }
+        }
         
         console.log('Making actual RPC call to add_custom_column with parameters:', {
           p_business_id: businessId,
           p_column_key: newColumnKey,
           p_display_name: newColumnName,
           p_column_type: newColumnType,
-          p_is_required: false,
-          p_options: options,
-          p_ui_settings: uiSettings
+          p_options: columnOptions
         });
         
-        // Make the actual RPC call
         const { data, error } = await supabase.rpc('add_custom_column', {
           p_business_id: businessId,
           p_column_key: newColumnKey,
           p_display_name: newColumnName,
           p_column_type: newColumnType,
           p_is_required: false,
-          p_options: options,
+          p_default_value: null,
+          p_options: columnOptions,
           p_ui_settings: uiSettings,
           p_user_id: $user?.id
         });
@@ -289,7 +336,11 @@
 
   function closeDialog() {
     console.log('closeDialog function called');
+    // Set isOpen to false to close the dialog
+    isOpen = false;
+    // Also dispatch the close event for any parent components
     dispatch('close');
+    dispatch('dialogClosed');
   }
 </script>
 
@@ -331,6 +382,73 @@
             </select>
           </div>
         </div>
+        
+        <!-- Dropdown options configuration (only shown for select type) -->
+        {#if newColumnType === 'select'}
+          <div class="mt-4">
+            <label for="dropdown-options" class="block text-sm font-medium mb-1">Dropdown Options</label>
+            <div class="text-xs text-gray-500 mb-2">Enter one option per line or comma-separated values</div>
+            <Textarea
+              id="dropdown-options"
+              bind:value={dropdownOptions}
+              placeholder="Option 1\nOption 2\nOption 3"
+              class="w-full h-24"
+              on:input={() => {
+                // Parse options from textarea
+                if (dropdownOptions.includes('\n')) {
+                  // Split by newline
+                  dropdownOptionsList = dropdownOptions.split('\n')
+                    .map(opt => opt.trim())
+                    .filter(opt => opt.length > 0);
+                } else {
+                  // Split by comma
+                  dropdownOptionsList = dropdownOptions.split(',')
+                    .map(opt => opt.trim())
+                    .filter(opt => opt.length > 0);
+                }
+              }}
+            />
+            
+            <!-- Preview of parsed options -->
+            {#if dropdownOptionsList.length > 0}
+              <div class="mt-2">
+                <div class="text-sm font-medium mb-1">Preview:</div>
+                <div class="flex flex-wrap gap-2">
+                  {#each dropdownOptionsList as option}
+                    <div class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">{option}</div>
+                  {/each}
+                </div>
+              </div>
+            {/if}
+          </div>
+        {/if}
+        
+        <!-- Date field configuration -->
+        {#if newColumnType === 'date'}
+          <div class="mt-4">
+            <label for="date-format" class="block text-sm font-medium mb-1">Date Format</label>
+            <select 
+              id="date-format" 
+              bind:value={dateFormat}
+              class="w-full px-3 py-2 border rounded-md mb-2"
+            >
+              <option value="yyyy-MM-dd">YYYY-MM-DD</option>
+              <option value="MM/dd/yyyy">MM/DD/YYYY</option>
+              <option value="dd/MM/yyyy">DD/MM/YYYY</option>
+              <option value="yyyy-MM-dd HH:mm">YYYY-MM-DD HH:MM</option>
+            </select>
+            
+            <label for="date-picker-type" class="block text-sm font-medium mb-1">Date Picker Type</label>
+            <select 
+              id="date-picker-type" 
+              bind:value={datePickerType}
+              class="w-full px-3 py-2 border rounded-md"
+            >
+              <option value="date">Date Only</option>
+              <option value="datetime-local">Date and Time</option>
+            </select>
+          </div>
+        {/if}
         <div class="flex justify-end">
           <!-- Always show the Cancel button when in edit mode -->
           {#if editMode}
@@ -411,7 +529,19 @@
     </div>
 
     <DialogFooter>
-      <Button variant="outline" on:click={closeDialog} class="border border-gray-300 hover:bg-gray-100">Close</Button>
+      <!-- Use a native button instead of the Button component to ensure the click event works -->
+      <button 
+        type="button" 
+        on:click={() => {
+          console.log('Close button clicked');
+          isOpen = false;
+          dispatch('close');
+          dispatch('dialogClosed');
+        }} 
+        class="px-4 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-100 text-sm font-medium"
+      >
+        Close
+      </button>
     </DialogFooter>
   </DialogContent>
 </Dialog>

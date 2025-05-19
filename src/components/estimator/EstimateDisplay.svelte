@@ -885,12 +885,38 @@
     border: 1px solid #4299e1 !important;
   }
   
+  /* Improve dropdown styling */
   :global(.revo-dropdown-list) {
     color: #000 !important;
     background-color: #fff !important;
     max-height: 200px !important;
     overflow-y: auto !important;
     z-index: 1000 !important;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 4px !important;
+  }
+  
+  /* Style dropdown options */
+  :global(.revo-dropdown-list .option) {
+    padding: 8px 12px !important;
+    cursor: pointer !important;
+    transition: background-color 0.2s !important;
+  }
+  
+  :global(.revo-dropdown-list .option:hover) {
+    background-color: #edf2f7 !important;
+  }
+  
+  :global(.revo-dropdown-list .selected) {
+    background-color: #ebf5ff !important;
+    font-weight: 500 !important;
+  }
+  
+  /* Style select inputs */
+  :global(select.revogr-edit) {
+    appearance: menulist !important;
+    padding-right: 20px !important;
   }
   
   /* Make grid container take up available vertical space */
@@ -1163,6 +1189,7 @@
       resize={true}
       canFocus={true}
       editors={true}
+      enableColumnEdit={true}
       on:beforeedit={(e) => {
         console.log('Before edit event:', e.detail);
         // Return true to allow editing
