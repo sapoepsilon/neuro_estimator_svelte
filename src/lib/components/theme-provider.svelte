@@ -1,35 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { modeWatcher } from 'mode-watcher';
+  import { initializeTheme } from '../../stores/themeStore';
 
   onMount(() => {
-    // Initialize theme based on system preference or stored preference
-    const { mode } = modeWatcher({
-      attribute: 'class',
-      defaultMode: 'light',
-      storageKey: 'theme-mode',
-    });
-
-    // Apply the theme on initial load
-    const storedTheme = localStorage.getItem('theme-mode');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    
-    let initialTheme = storedTheme;
-    if (!initialTheme) {
-      initialTheme = prefersDark ? 'dark' : 'light';
-    }
-
-    // Update the document class for Tailwind
-    if (initialTheme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-
-    // Set the initial mode
-    mode.set(initialTheme);
+    // Initialize theme from store
+    initializeTheme();
   });
 </script>
 
 <slot />
-
