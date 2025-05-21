@@ -11,6 +11,7 @@
   import AiSidebar from "$lib/components/ai-sidebar.svelte";
   import { Toaster } from "$lib/components/ui/sonner";
   import { supabase } from '$lib/supabase';
+  import ThemeProvider from '$lib/components/theme-provider.svelte';
 
   import { Menu } from "lucide-svelte";
   
@@ -123,7 +124,7 @@
   });
 </script>
 
-
+<ThemeProvider>
   <div class="flex h-screen w-full overflow-hidden">
     <AppSidebar bind:sidebarVisible={showMobileSidebar} {openLoginDialog} />
     <div class="flex-1 flex flex-col overflow-hidden relative">
@@ -149,18 +150,18 @@
     />
   </div>
 
+  <LoginDialog 
+    open={loginDialogOpen} 
+    onOpenChange={handleLoginDialogOpenChange} 
+  />
 
-<LoginDialog 
-  open={loginDialogOpen} 
-  onOpenChange={handleLoginDialogOpenChange} 
-/>
+  <WelcomeDialog
+    bind:open={welcomeDialogOpen}
+    onOpenChange={handleWelcomeDialogOpenChange}
+  />
 
-<WelcomeDialog
-  bind:open={welcomeDialogOpen}
-  onOpenChange={handleWelcomeDialogOpenChange}
-/>
-
-<Toaster />
+  <Toaster />
+</ThemeProvider>
 
 <style>
   /* Global styles can be added here */
