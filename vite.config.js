@@ -9,7 +9,20 @@ export default defineConfig(({ mode }) => {
   const backendUrl = env.VITE_BACKEND_URL || "http://localhost:8080";
 
   return {
-    plugins: [svelte()],
+    plugins: [
+      svelte({
+        onwarn: (warning, handler) => {
+          // Ignore specific warnings
+          if (warning.code === 'css-unused-selector' || 
+              warning.code === 'element-implicitly-closed' ||
+              warning.code === 'export_let_unused') {
+            return;
+          }
+          // Let Svelte handle all other warnings normally
+          handler(warning);
+        }
+      })
+    ],
     server: {
       proxy: {
         // Proxy API requests to backend to avoid CORS issues
