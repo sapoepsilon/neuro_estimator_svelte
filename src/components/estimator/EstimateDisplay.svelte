@@ -725,78 +725,84 @@
 </script>
 
 <style>
-  /* Fix for invisible text in editable cells */
-  :global(.revogr-edit) {
-    color: #000 !important;
-    background-color: #fff !important;
-    border: 1px solid #4299e1 !important;
-    padding: 4px !important;
-  }
-  
-  :global(.revogr-focus) {
-    border: 1px solid #4299e1 !important;
-  }
-  
-  :global(.revo-dropdown-list) {
-    color: #000 !important;
-    background-color: #fff !important;
-    max-height: 200px !important;
-    overflow-y: auto !important;
-    z-index: 1000 !important;
-  }
-  
-  /* Make grid container take up available vertical space */
-  .grid-container {
-    display: flex;
-    flex-direction: column;
+  /* Grid container */
+  :global(.grid-container) {
+    height: calc(100vh - 200px); /* Adjust this value based on your layout */
+    min-height: 500px;
     width: 100%;
-    height: auto;
-  }
-  
-  /* Responsive grid height */
-  @media (max-width: 640px) {
-    .grid-container {
-      height: 500px;
-      min-height: 300px;
-      max-height: 70vh;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
-    }
-    
-    /* Improve mobile grid behavior */
-    :global(.grid-container > .revogr-holder) {
-      overflow: visible !important;
-      touch-action: manipulation; /* Improve touch handling */
-    }
-    
-    /* Prevent focus loss on touch */
-    :global(.revogr-focus) {
-      outline: 2px solid #4299e1 !important;
-      outline-offset: -2px;
-      z-index: 5 !important;
-    }
-    
-    /* Improve touch targets for better usability */
-    :global(.revogr-cell) {
-      min-height: 44px !important; /* Minimum touch target size */
-    }
-  }
-  
-  @media (min-width: 641px) {
-    .grid-container {
-      height: 700px; /* Fixed height to enable scrolling */
-      min-height: 600px;
-      max-height: 90vh; /* Limit maximum height */
-      overflow-y: auto; /* Enable vertical scrolling */
-      padding-bottom: 50px; /* Add some padding at the bottom */
-    }
-  }
-  
-  /* Ensure RevoGrid takes full height of its container */
-  :global(.grid-container > .revogr-holder) {
-    flex: 1;
-    height: 100% !important;
     position: relative;
+    overflow: hidden; /* Prevent container scrolling */
+  }
+  
+  /* Mobile-specific styles to ensure only the grid scrolls */
+  @media (max-width: 768px) {
+    :global(.grid-container) {
+      height: calc(100vh - 150px); /* Slightly more space on mobile */
+      overflow: visible; /* Allow the grid to handle its own scrolling */
+    }
+    
+    /* Prevent scrolling on main containers */
+    body, html {
+      overflow: hidden;
+      height: 100%;
+      position: fixed;
+      width: 100%;
+    }
+    
+    /* Allow only the grid viewport to scroll */
+    :global(.grid-container .rgViewport) {
+      overflow-y: auto !important;
+    }
+    
+    /* Specific styles for our mobile grid container */
+    :global(.mobile-grid-container) {
+      position: relative;
+      z-index: 10; /* Ensure grid is above other elements */
+      max-height: calc(100vh - 150px);
+    }
+    
+    /* Ensure the grid takes available space */
+    :global(.mobile-grid-container revo-grid) {
+      max-height: 100%;
+    }
+  }
+  
+  /* Override RevoGrid's default height settings */
+  :global(.grid-container revo-grid) {
+    height: 100% !important;
+    min-height: 100% !important;
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  
+  :global(.grid-container .rgViewport) {
+    height: 100% !important;
+    flex: 1 !important;
+  }
+  
+  :global(.grid-container .main-viewport) {
+    height: 100% !important;
+  }
+  
+  :global(.grid-container .vertical-inner) {
+    height: 100% !important;
+  }
+  
+  :global(.grid-container .horizontal-inner) {
+    width: 100% !important;
+  }
+  
+  /* Dark mode styles for the grid */
+  :global(.dark .revogr-holder) {
+    --revogr-background-color: hsl(var(--background));
+    --revogr-border-color: hsl(var(--border));
+    --revogr-header-color: hsl(var(--muted));
+    --revogr-header-text-color: hsl(var(--foreground));
+    --revogr-cell-text-color: hsl(var(--foreground));
+    --revogr-cell-hover-color: hsl(var(--accent));
+    --revogr-cell-selected-color: hsl(var(--primary));
+    --revogr-cell-selected-text-color: hsl(var(--primary-foreground));
   }
   
   /* Fix horizontal scrollbar position */
@@ -805,6 +811,10 @@
     bottom: 0 !important;
     z-index: 10 !important;
     background-color: white;
+  }
+  
+  :global(.dark .revogr-horizontal-scrollable) {
+    background-color: hsl(var(--background));
   }
   
   /* Mobile horizontal scrollbar adjustments */
@@ -819,17 +829,22 @@
     background-color: #4299e1 !important;
     color: white !important;
   }
+  
+  :global(.dark .revo-dropdown-list .selected) {
+    background-color: hsl(var(--primary)) !important;
+    color: hsl(var(--primary-foreground)) !important;
+  }
 </style>
 
 {#if gridSource.length > 0}
-  <div class="bg-white rounded-md shadow mb-4 flex flex-col">
-    <div class="p-3 sm:p-4 bg-slate-50 rounded-t-md border-b">
+  <div class="bg-background rounded-md shadow mb-4 flex flex-col">
+    <div class="p-3 sm:p-4 bg-muted rounded-t-md border-b">
       <!-- Desktop layout - Optimized for better space utilization -->
       <div class="hidden sm:flex items-center justify-between gap-4 w-full">
         <div class="flex items-center gap-4 flex-grow">
           <div>
             <h4 class="font-medium">{result.estimate?.title || 'Project Estimate'}</h4>
-            <p class="text-sm text-slate-500">Currency: {result.estimate?.currency || 'USD'}</p>
+            <p class="text-sm text-muted-foreground">Currency: {result.estimate?.currency || 'USD'}</p>
           </div>
           <div class="ml-auto flex items-center">
             <p class="text-lg font-semibold">{result.estimate?.totalAmount || 0} {result.estimate?.currency || 'USD'}</p>
@@ -847,7 +862,7 @@
           </button>
           <button 
             on:click={toggleNewItemForm} 
-            class="bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white px-3 py-2 rounded-md text-sm font-medium flex items-center justify-center shadow-sm transition-colors"
+            class="bg-primary hover:bg-primary/90 active:bg-primary/80 text-primary-foreground px-3 py-2 rounded-md text-sm font-medium flex items-center justify-center shadow-sm transition-colors"
           >
             {#if !showNewItemForm}
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -869,7 +884,7 @@
           <div>
             <h4 class="font-medium">{result.estimate?.title || 'Project Estimate'}</h4>
             <div class="flex items-center gap-2 mt-0.5">
-              <span class="text-xs text-slate-500">{result.estimate?.currency || 'USD'}</span>
+              <span class="text-xs text-muted-foreground">{result.estimate?.currency || 'USD'}</span>
               <span class="text-base font-semibold">{result.estimate?.totalAmount || 0}</span>
             </div>
           </div>
@@ -885,7 +900,7 @@
             </button>
             <button 
               on:click={toggleNewItemForm} 
-              class="bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white p-1.5 rounded-md flex items-center justify-center shadow-sm"
+              class="bg-primary hover:bg-primary/90 active:bg-primary/80 text-primary-foreground p-1.5 rounded-md flex items-center justify-center shadow-sm"
               aria-label="{showNewItemForm ? 'Cancel' : 'Add new item'}"
             >
               {#if !showNewItemForm}
@@ -908,17 +923,17 @@
           <h5 class="font-medium mb-3">Add New Estimate Item</h5>
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <div class="col-span-1 md:col-span-2">
-              <label for="item-description" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+              <label for="item-description" class="block text-sm font-medium text-foreground mb-1">Description</label>
               <input 
                 id="item-description"
                 type="text" 
                 bind:value={newItem.description} 
-                class="w-full p-2 border border-gray-300 rounded-md"
+                class="w-full p-2 border border-input bg-background rounded-md"
                 placeholder="Item description"
               />
             </div>
             <div>
-              <label for="item-quantity" class="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+              <label for="item-quantity" class="block text-sm font-medium text-foreground mb-1">Quantity</label>
               <input 
                 id="item-quantity"
                 type="number" 
@@ -926,15 +941,15 @@
                 min="0.01" 
                 step="0.01"
                 on:input={calculateAmount}
-                class="w-full p-2 border border-gray-300 rounded-md"
+                class="w-full p-2 border border-input bg-background rounded-md"
               />
             </div>
             <div>
-              <label for="item-unit-type" class="block text-sm font-medium text-gray-700 mb-1">Unit Type</label>
+              <label for="item-unit-type" class="block text-sm font-medium text-foreground mb-1">Unit Type</label>
               <select 
                 id="item-unit-type"
                 bind:value={newItem.unitType} 
-                class="w-full p-2 border border-gray-300 rounded-md"
+                class="w-full p-2 border border-input bg-background rounded-md"
               >
                 <option value="hour">Hour</option>
                 <option value="day">Day</option>
@@ -946,11 +961,11 @@
               </select>
             </div>
             <div>
-              <label for="item-cost-type" class="block text-sm font-medium text-gray-700 mb-1">Cost Type</label>
+              <label for="item-cost-type" class="block text-sm font-medium text-foreground mb-1">Cost Type</label>
               <select 
                 id="item-cost-type"
                 bind:value={newItem.costType} 
-                class="w-full p-2 border border-gray-300 rounded-md"
+                class="w-full p-2 border border-input bg-background rounded-md"
               >
                 <option value="material">Material</option>
                 <option value="labor">Labor</option>
@@ -960,7 +975,7 @@
               </select>
             </div>
             <div>
-              <label for="item-unit-price" class="block text-sm font-medium text-gray-700 mb-1">Unit Price</label>
+              <label for="item-unit-price" class="block text-sm font-medium text-foreground mb-1">Unit Price</label>
               <input 
                 id="item-unit-price"
                 type="number" 
@@ -968,7 +983,7 @@
                 min="0.01" 
                 step="0.01"
                 on:input={calculateAmount}
-                class="w-full p-2 border border-gray-300 rounded-md"
+                class="w-full p-2 border border-input bg-background rounded-md"
               />
             </div>
           </div>
@@ -979,7 +994,7 @@
             </div>
             <button 
               on:click={addNewItem} 
-              class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md text-sm"
+              class="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md text-sm"
             >
               Save Item
             </button>
@@ -988,7 +1003,7 @@
       {/if}
     </div>
   </div>
-  <div class="grid-container flex-1 bg-white rounded-md overflow-hidden mobile-grid-container">
+  <div class="grid-container flex-1 bg-background rounded-md overflow-hidden mobile-grid-container">
     <RevoGrid
       source={gridSource} 
       columns={gridColumns}
@@ -1018,15 +1033,15 @@
         tripleState: true
       }}
       rowClass={(row) => {
-        if (row.isHeader) return 'font-semibold bg-slate-100';
-        if (row.isSubItem) return 'text-sm text-slate-600';
+        if (row.isHeader) return 'font-semibold bg-muted';
+        if (row.isSubItem) return 'text-sm text-muted-foreground';
         if (row.isTotal) return 'font-bold text-lg border-t-2';
         return '';
       }}
     />
   </div>
 {:else}
-  <div class="bg-slate-50 p-4 rounded-md">
+  <div class="bg-muted p-4 rounded-md">
     <pre class="whitespace-pre-wrap text-sm">{JSON.stringify(result, null, 2)}</pre>
   </div>
 {/if}

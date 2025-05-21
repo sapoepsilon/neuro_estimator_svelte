@@ -1,5 +1,6 @@
 <script lang="ts">
   import { user, signOut } from "../stores/authStore";
+  import { ThemeToggle } from "$lib/components/ui/theme-toggle";
   export let openLoginDialog = () => {};
 </script>
 
@@ -13,6 +14,7 @@
     
     <div class="flex flex-1 items-center justify-end space-x-4">
       <nav class="flex items-center space-x-2">
+        <ThemeToggle />
         {#if $user}
           <div class="items-center space-x-2 ml-4 hidden md:flex">
             <button on:click={signOut} class="hidden md:inline-flex">
