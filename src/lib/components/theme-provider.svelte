@@ -1,15 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { modeWatcher } from 'mode-watcher';
+  import { ModeWatcher, mode, setMode } from 'mode-watcher';
 
   onMount(() => {
-    // Initialize theme based on system preference or stored preference
-    const { mode } = modeWatcher({
-      attribute: 'class',
-      defaultMode: 'light',
-      storageKey: 'theme-mode',
-    });
-
     // Apply the theme on initial load
     const storedTheme = localStorage.getItem('theme-mode');
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -27,9 +20,14 @@
     }
 
     // Set the initial mode
-    mode.set(initialTheme);
+    setMode(initialTheme);
   });
 </script>
 
-<slot />
+<ModeWatcher
+  attribute="class"
+  defaultMode="light"
+  storageKey="theme-mode"
+/>
 
+<slot />

@@ -2,18 +2,11 @@
   import { onMount } from 'svelte';
   import { Sun, Moon } from 'lucide-svelte';
   import { Button } from '$lib/components/ui/button';
-  import { modeWatcher } from 'mode-watcher';
+  import { mode, toggleMode } from 'mode-watcher';
 
   let theme: 'light' | 'dark' = 'light';
 
   onMount(() => {
-    // Initialize theme based on system preference or stored preference
-    const { mode } = modeWatcher({
-      attribute: 'class',
-      defaultMode: 'light',
-      storageKey: 'theme-mode',
-    });
-
     // Subscribe to mode changes
     const unsubscribe = mode.subscribe((value) => {
       theme = value;
@@ -26,8 +19,8 @@
   });
 
   function toggleTheme() {
+    toggleMode();
     const newTheme = theme === 'light' ? 'dark' : 'light';
-    theme = newTheme;
     updateTheme(newTheme);
   }
 
@@ -51,4 +44,3 @@
     <Sun class="h-5 w-5" />
   {/if}
 </Button>
-
