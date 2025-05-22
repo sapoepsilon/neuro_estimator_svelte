@@ -86,17 +86,18 @@ export async function loadColumnConfigurations(projectId, userId) {
     
     console.log('Loading columns for business ID:', businessId);
     
-    // Get custom columns using the RPC function
-    const { data, error } = await supabase.rpc('get_business_columns', {
-      p_business_id: businessId
-    });
+    // Get custom columns from the custom_columns table
+    const { data, error } = await supabase
+      .from('custom_columns')
+      .select('*')
+      .eq('business_id', businessId);
     
     console.log('Business columns response:', { data, error });
     
     if (error) throw error;
     
-    // Parse the JSON result if it's a string
-    const columns = typeof data === 'string' ? JSON.parse(data) : data || [];
+    // Use the data directly, no need to parse
+    const columns = data || [];
     console.log('Parsed columns:', columns);
     
     // If we got an empty array or no data, use default columns
@@ -130,17 +131,21 @@ export async function addCustomColumn(columnData) {
   try {
     console.log('Adding custom column with data:', columnData);
     
-    // Call the RPC function to add a custom column
-    const { data, error } = await supabase.rpc('add_custom_column', {
-      p_business_id: columnData.business_id,
-      p_column_key: columnData.column_key,
-      p_display_name: columnData.display_name,
-      p_column_type: columnData.column_type,
-      p_is_required: columnData.is_required || false,
-      p_default_value: columnData.default_value || null,
-      p_options: columnData.options || null,
-      p_ui_settings: columnData.ui_settings || {}
-    });
+    // Insert directly into the custom_columns table
+    const { data, error } = await supabase
+      .from('custom_columns')
+      .insert({
+        business_id: columnData.business_id,
+        column_key: columnData.column_key,
+        display_name: columnData.display_name,
+        column_type: columnData.column_type,
+        is_required: columnData.is_required || false,
+        default_value: columnData.default_value || null,
+        options: columnData.options || null,
+        ui_settings: columnData.ui_settings || {},
+        created_by: columnData.created_by
+      })
+      .select();
     
     console.log('RPC response:', { data, error });
     
@@ -167,12 +172,13 @@ export async function renameCustomColumn(businessId, columnKey, newDisplayName) 
   try {
     console.log('Renaming column with params:', { businessId, columnKey, newDisplayName });
     
-    // Call the RPC function to rename a custom column
-    const { data, error } = await supabase.rpc('rename_custom_column', {
-      p_business_id: businessId,
-      p_column_key: columnKey,
-      p_new_display_name: newDisplayName
-    });
+    // Update the display_name in the custom_columns table
+    const { data, error } = await supabase
+      .from('custom_columns')
+      .update({ display_name: newDisplayName })
+      .eq('business_id', businessId)
+      .eq('column_key', columnKey)
+      .select();
     
     console.log('Rename column response:', { data, error });
     
@@ -200,12 +206,13 @@ export async function updateColumnUISettings(businessId, columnKey, uiSettings) 
   try {
     console.log('Updating column UI settings:', { businessId, columnKey, uiSettings });
     
-    // Call the RPC function to update column UI settings
-    const { data, error } = await supabase.rpc('update_column_ui_settings', {
-      p_business_id: businessId,
-      p_column_key: columnKey,
-      p_ui_settings: uiSettings
-    });
+    // Update the ui_settings in the custom_columns table
+    const { data, error } = await supabase
+      .from('custom_columns')
+      .update({ ui_settings: uiSettings })
+      .eq('business_id', businessId)
+      .eq('column_key', columnKey)
+      .select();
     
     console.log('Update UI settings response:', { data, error });
     
@@ -231,13 +238,14 @@ export async function updateColumnUISettings(businessId, columnKey, uiSettings) 
 // Delete a custom column
 export async function deleteCustomColumn(businessId, columnKey) {
   try {
-    console.log('Deleting column:', { businessId, columnKey });
+    console.log('Deleting custom column:', { businessId, columnKey });
     
-    // Call the RPC function to delete a custom column
-    const { data, error } = await supabase.rpc('delete_custom_column', {
-      p_business_id: businessId,
-      p_column_key: columnKey
-    });
+    // Delete from the custom_columns table
+    const { data, error } = await supabase
+      .from('custom_columns')
+      .delete()
+      .eq('business_id', businessId)
+      .eq('column_key', columnKey);
     
     console.log('Delete column response:', { data, error });
     
@@ -282,7 +290,12 @@ export function getGridColumns(configs, options = {}) {
     };
     
     // Add type-specific properties
-    if (config.column_type === 'number') {
+    if (config.column_type === 'text') {
+      // Explicitly set the text editor for text columns
+      column.columnType = 'string';
+      // @ts-ignore - RevoGrid accepts string editor types
+      column.editor = 'text';
+    } else if (config.column_type === 'number') {
       column.columnType = 'numeric';
       // @ts-ignore - RevoGrid accepts string editor types
       column.editor = 'number';

@@ -72,3 +72,4 @@ export const signOut = async () => {
   // Refresh the page after sign out
   window.location.reload();
 };
+

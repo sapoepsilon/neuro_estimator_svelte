@@ -8,11 +8,11 @@
   import { toast } from "svelte-sonner";
   import { writable } from "svelte/store";
   import { user } from '../../stores/authStore';
+  import { getBusinessId } from '../../stores/userStore';
   import { supabase } from '$lib/supabase';
-  // We'll call RPC functions directly
+  import { testAddColumn } from '../../utils/testColumnCreation';
 
   export let isOpen = false;
-  // Use export const for external reference only (not a prop)
   export const projectId = null;
   export const onClose = () => {};
   export const onColumnSaved = () => {};
@@ -32,16 +32,13 @@
   let dropdownOptions = "";
   let dropdownOptionsList = [];
   
-  // For date format
   let dateFormat = "yyyy-MM-dd";
-  let datePickerType = "date"; // date, datetime-local, etc.
+  let datePickerType = "date"; 
 
   // Column type options
   const columnTypes = [
     { value: "text", label: "Text" },
-    { value: "number", label: "Number" },
-    { value: "select", label: "Dropdown" },
-    { value: "date", label: "Date" }
+    { value: "number", label: "Number" }
   ];
 
   // Default columns that cannot be deleted
@@ -49,44 +46,74 @@
     "description",
     "quantity",
     "unitPrice",
+    "unit_type",
     "amount"
   ];
 
   // Reset form when dialog opens/closes
   $: if (isOpen) {
     resetForm();
-    getBusinessId();
-    // Force editMode to false when dialog opens
+    fetchBusinessIdAndLoadColumns();
     editMode = false;
-    console.log('Dialog opened, editMode set to:', editMode);
   }
   
-  // When the dialog opens or closes, log it
   $: {
-    console.log('Dialog isOpen state changed:', isOpen);
     if (!isOpen && businessId) {
-      console.log('Dialog closed with businessId:', businessId);
       dispatch('dialogClosed');
     }
   }
   
-  // Get the business ID for the current user
-  async function getBusinessId() {
+  async function fetchBusinessIdAndLoadColumns() {
     try {
-      const { data, error } = await supabase
-        .from('business_users')
-        .select('business_id')
-        .eq('user_id', $user.id)
-        .single();
+      businessId = await getBusinessId();
+      console.log('Fetched business ID:', businessId);
       
-      if (error) throw error;
-      businessId = data.business_id;
-      
-      // After getting business ID, load columns
-      await loadColumns();
+      if (businessId) {
+        await loadColumns();
+      }
     } catch (error) {
-      console.error('Error getting business ID:', error);
-      toast.error('Failed to get business information');
+      console.error('Error in fetchBusinessIdAndLoadColumns:', error);
+    }
+  }
+  
+  // Test function to verify the custom_columns table
+  async function testCustomColumnsTable() {
+    try {
+      if (!businessId) {
+        businessId = await getBusinessId();
+        if (!businessId) {
+          toast.error('No business ID available');
+          return;
+        }
+      }
+      
+      // First, check if the table exists by trying to get a single row
+      const { data: tableCheck, error: tableCheckError } = await supabase
+        .from('custom_columns')
+        .select('id')
+        .limit(1);
+      
+      if (tableCheckError) {
+        console.error('Error checking custom_columns table:', tableCheckError);
+        toast.error(`Table check failed: ${tableCheckError.message}`);
+        return;
+      }
+      
+      toast.info('Testing column creation...');
+      
+      // Try to add a test column
+      const result = await testAddColumn(businessId);
+      
+      if (result) {
+        toast.success('Test column created successfully!');
+        // Reload columns to show the new test column
+        await loadColumns();
+      } else {
+        toast.error('Failed to create test column');
+      }
+    } catch (error) {
+      console.error('Error in testCustomColumnsTable:', error);
+      toast.error(`Test failed: ${error.message}`);
     }
   }
   
@@ -95,17 +122,17 @@
     if (!businessId) return;
     
     try {
-      console.log('Loading columns for business ID:', businessId);
       
-      // Get custom columns using the RPC function
-      const { data, error } = await supabase.rpc('get_business_columns', {
-        p_business_id: businessId
-      });
+      // Get custom columns directly from the table
+      const { data, error } = await supabase
+        .from('custom_columns')
+        .select('*')
+        .eq('business_id', businessId);
       
       if (error) throw error;
       
-      // Parse the JSON result if it's a string
-      const columns = typeof data === 'string' ? JSON.parse(data) : data || [];
+      // Use the data directly
+      const columns = data || [];
       console.log('Loaded columns:', columns);
       
       // Update the column configurations by dispatching an event
@@ -189,15 +216,16 @@
 
       if (editMode && editingColumn) {
         console.log('Renaming column:', editingColumn);
-        // Update existing column (rename) using direct RPC call
-        const { data, error } = await supabase.rpc('rename_custom_column', {
-          p_business_id: businessId,
-          p_column_key: editingColumn.column_key,
-          p_new_display_name: newColumnName
-        });
+        // Update existing column (rename) using direct table operation
+        const { data, error } = await supabase
+          .from('custom_columns')
+          .update({ display_name: newColumnName })
+          .eq('business_id', businessId)
+          .eq('column_key', editingColumn.column_key)
+          .select();
         
         if (error) throw error;
-        result = data;
+        result = data[0];
         console.log('Column renamed result:', result);
         toast.success("Column renamed successfully");
       } else {
@@ -252,25 +280,32 @@
           }
         }
         
-        console.log('Making actual RPC call to add_custom_column with parameters:', {
-          p_business_id: businessId,
-          p_column_key: newColumnKey,
-          p_display_name: newColumnName,
-          p_column_type: newColumnType,
-          p_options: columnOptions
+        console.log('Inserting new column with parameters:', {
+          business_id: businessId,
+          column_key: newColumnKey,
+          display_name: newColumnName,
+          column_type: newColumnType,
+          options: columnOptions
         });
         
-        const { data, error } = await supabase.rpc('add_custom_column', {
-          p_business_id: businessId,
-          p_column_key: newColumnKey,
-          p_display_name: newColumnName,
-          p_column_type: newColumnType,
-          p_is_required: false,
-          p_default_value: null,
-          p_options: columnOptions,
-          p_ui_settings: uiSettings,
-          p_user_id: $user?.id
-        });
+        // Get current user from store
+        const currentUser = $user;
+        const userId = currentUser?.id;
+        
+        const { data, error } = await supabase
+          .from('custom_columns')
+          .insert({
+            business_id: businessId,
+            column_key: newColumnKey,
+            display_name: newColumnName,
+            column_type: newColumnType,
+            is_required: false,
+            default_value: null,
+            options: columnOptions,
+            ui_settings: uiSettings,
+            created_by: userId
+          })
+          .select();
         
         console.log('RPC call completed, response:', { data, error });
         
@@ -313,11 +348,12 @@
     isLoading = true;
 
     try {
-      // Delete the custom column using direct RPC call
-      const { data, error } = await supabase.rpc('delete_custom_column', {
-        p_business_id: businessId,
-        p_column_key: column.column_key
-      });
+      // Delete the custom column using direct table operation
+      const { data, error } = await supabase
+        .from('custom_columns')
+        .delete()
+        .eq('business_id', businessId)
+        .eq('column_key', column.column_key);
       
       if (error) throw error;
       
@@ -529,18 +565,32 @@
     </div>
 
     <DialogFooter>
+      <!-- Test button to verify the custom_columns table -->
+      <button 
+        type="button" 
+        class="btn bg-purple-600 hover:bg-purple-700 text-white" 
+        on:click={testCustomColumnsTable}
+        disabled={isLoading}
+      >
+        Test DB Table
+      </button>
+      
       <!-- Use a native button instead of the Button component to ensure the click event works -->
       <button 
         type="button" 
-        on:click={() => {
-          console.log('Close button clicked');
-          isOpen = false;
-          dispatch('close');
-          dispatch('dialogClosed');
-        }} 
-        class="px-4 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-100 text-sm font-medium"
+        class="btn bg-gray-200 hover:bg-gray-300 text-gray-800 ml-2" 
+        on:click={closeDialog}
+        disabled={isLoading}
       >
-        Close
+        Cancel
+      </button>
+      <button 
+        type="button" 
+        class="btn bg-blue-600 hover:bg-blue-700 text-white ml-2" 
+        on:click={saveColumn}
+        disabled={isLoading}
+      >
+        {editMode ? 'Update' : 'Add'} Column
       </button>
     </DialogFooter>
   </DialogContent>
