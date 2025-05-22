@@ -291,7 +291,6 @@ export function getGridColumns(configs, options = {}) {
     
     // Add type-specific properties
     if (config.column_type === 'text') {
-      // Explicitly set the text editor for text columns
       column.columnType = 'string';
       // @ts-ignore - RevoGrid accepts string editor types
       column.editor = 'text';
@@ -300,20 +299,16 @@ export function getGridColumns(configs, options = {}) {
       // @ts-ignore - RevoGrid accepts string editor types
       column.editor = 'number';
     } else if (config.column_type === 'select' || config.column_type === 'multiselect') {
-      // Parse options from the options field
       let optionsArray = [];
       
       if (config.options) {
         try {
-          // If options is a string, try to parse it
           if (typeof config.options === 'string') {
             optionsArray = JSON.parse(config.options);
           } 
-          // If options is already an array, use it directly
           else if (Array.isArray(config.options)) {
             optionsArray = config.options;
           }
-          // If options is an object with values, convert it
           else if (typeof config.options === 'object') {
             optionsArray = Object.entries(config.options).map(([key, value]) => ({
               label: value,
@@ -325,12 +320,9 @@ export function getGridColumns(configs, options = {}) {
         }
       }
       
-      // Log the options being used for the dropdown
       console.log(`Setting up dropdown options for column ${config.column_key}:`, optionsArray);
       
-      // Format options for the editor
       const formattedOptions = optionsArray.map(opt => {
-        // Handle different option formats
         let label, value;
         
         if (typeof opt === 'string') {

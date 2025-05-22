@@ -10,7 +10,6 @@
   import { user } from '../../stores/authStore';
   import { getBusinessId } from '../../stores/userStore';
   import { supabase } from '$lib/supabase';
-  import { testAddColumn } from '../../utils/testColumnCreation';
 
   export let isOpen = false;
   export const projectId = null;
@@ -76,53 +75,13 @@
     }
   }
   
-  // Test function to verify the custom_columns table
-  async function testCustomColumnsTable() {
-    try {
-      if (!businessId) {
-        businessId = await getBusinessId();
-        if (!businessId) {
-          toast.error('No business ID available');
-          return;
-        }
-      }
-      
-      // First, check if the table exists by trying to get a single row
-      const { data: tableCheck, error: tableCheckError } = await supabase
-        .from('custom_columns')
-        .select('id')
-        .limit(1);
-      
-      if (tableCheckError) {
-        console.error('Error checking custom_columns table:', tableCheckError);
-        toast.error(`Table check failed: ${tableCheckError.message}`);
-        return;
-      }
-      
-      toast.info('Testing column creation...');
-      
-      // Try to add a test column
-      const result = await testAddColumn(businessId);
-      
-      if (result) {
-        toast.success('Test column created successfully!');
-        // Reload columns to show the new test column
-        await loadColumns();
-      } else {
-        toast.error('Failed to create test column');
-      }
-    } catch (error) {
-      console.error('Error in testCustomColumnsTable:', error);
-      toast.error(`Test failed: ${error.message}`);
-    }
-  }
+
   
   // Load columns for the business
   async function loadColumns() {
     if (!businessId) return;
     
     try {
-      
       // Get custom columns directly from the table
       const { data, error } = await supabase
         .from('custom_columns')
@@ -131,12 +90,28 @@
       
       if (error) throw error;
       
-      // Use the data directly
-      const columns = data || [];
-      console.log('Loaded columns:', columns);
+      // Use the data directly for custom columns
+      const customColumns = data || [];
+      console.log('Loaded custom columns:', customColumns);
       
-      // Update the column configurations by dispatching an event
-      dispatch('columnsLoaded', columns);
+      // Create default column objects
+      const defaultColumnsObjects = defaultColumns.map(key => ({
+        column_key: key,
+        display_name: key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' '),
+        column_type: key === 'unitPrice' || key === 'quantity' || key === 'amount' ? 'number' : 'text',
+        is_required: true,
+        is_default: true
+      }));
+      
+      // Combine default columns with custom columns
+      const allColumns = [...defaultColumnsObjects, ...customColumns];
+      console.log('Combined columns (default + custom):', allColumns);
+      
+      // Update the column configurations
+      columnConfigurations = allColumns;
+      
+      // Also dispatch the event for parent components
+      dispatch('columnsLoaded', allColumns);
     } catch (error) {
       console.error('Error loading columns:', error);
       toast.error('Failed to load columns');
@@ -534,12 +509,14 @@
                     {columnTypes.find(t => t.value === column.column_type)?.label || column.column_type}
                   </td>
                   <td class="py-2 px-3 text-right">
-                    <button 
-                      class="text-blue-600 hover:text-blue-800 mr-2"
-                      on:click={() => editColumn(column)}
-                    >
-                      Edit
-                    </button>
+                    {#if !defaultColumns.includes(column.column_key)}
+                      <button 
+                        class="text-blue-600 hover:text-blue-800 mr-2"
+                        on:click={() => editColumn(column)}
+                      >
+                        Edit
+                      </button>
+                    {/if}
                     {#if !defaultColumns.includes(column.column_key)}
                       <button 
                         class="text-red-600 hover:text-red-800"
@@ -565,20 +542,10 @@
     </div>
 
     <DialogFooter>
-      <!-- Test button to verify the custom_columns table -->
-      <button 
-        type="button" 
-        class="btn bg-purple-600 hover:bg-purple-700 text-white" 
-        on:click={testCustomColumnsTable}
-        disabled={isLoading}
-      >
-        Test DB Table
-      </button>
-      
       <!-- Use a native button instead of the Button component to ensure the click event works -->
       <button 
         type="button" 
-        class="btn bg-gray-200 hover:bg-gray-300 text-gray-800 ml-2" 
+        class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-md font-medium transition-colors" 
         on:click={closeDialog}
         disabled={isLoading}
       >
@@ -586,11 +553,15 @@
       </button>
       <button 
         type="button" 
-        class="btn bg-blue-600 hover:bg-blue-700 text-white ml-2" 
+        class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md font-medium transition-colors ml-2" 
         on:click={saveColumn}
         disabled={isLoading}
       >
-        {editMode ? 'Update' : 'Add'} Column
+        {#if isLoading}
+          Saving...
+        {:else}
+          {editMode ? 'Update Column' : 'Add Column'}
+        {/if}
       </button>
     </DialogFooter>
   </DialogContent>
