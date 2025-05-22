@@ -10,6 +10,7 @@
   import AppSidebar from "$lib/components/app-sidebar.svelte";
   import AiSidebar from "$lib/components/ai-sidebar.svelte";
   import { Toaster } from "$lib/components/ui/sonner";
+  import { supabase } from '$lib/supabase';
 
   import { Menu } from "lucide-svelte";
   
@@ -94,9 +95,16 @@
   }
   
   // Initialize auth store and set up event listeners on mount
-  onMount(() => {
+  onMount(async () => {
     // Initialize auth store
-    initializeAuthStore();
+    await initializeAuthStore();
+    
+    // Get the current session to check if user is authenticated
+    const { data } = await supabase.auth.getSession();
+    if (!data.session) {
+      // If no session exists, open the login dialog for new users
+      loginDialogOpen = true;
+    }
     
     // Listen for project selection events
     window.addEventListener('projectSelected', handleProjectSelected);
