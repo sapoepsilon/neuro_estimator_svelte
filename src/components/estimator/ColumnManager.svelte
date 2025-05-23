@@ -24,7 +24,6 @@
   let editMode = false;
   let businessId = null;
   
-  // Column type options
   const columnTypes = [
     { value: "text", label: "Text" },
     { value: "number", label: "Number" }
@@ -39,7 +38,6 @@
     "amount"
   ];
 
-  // Reset form when dialog opens/closes
   $: if (isOpen) {
     resetForm();
     fetchBusinessIdAndLoadColumns();
@@ -222,18 +220,16 @@
     isLoading = true;
 
     try {
-      const { data, error } = await supabase
-        .from('custom_columns')
-        .delete()
-        .eq('business_id', businessId)
-        .eq('column_key', column.column_key);
+      const { deleteCustomColumn } = await import('../../stores/columnStore');
+      const result = await deleteCustomColumn(businessId, column.column_key);
       
-      if (error) throw error;
-      
-      toast.success("Column deleted successfully");
-      dispatch('columnDeleted', { businessId, columnKey: column.column_key });
-      
-      await loadColumns();
+      if (result.success) {
+        toast.success("Column deleted successfully and data cleaned up");
+        dispatch('columnDeleted', { businessId, columnKey: column.column_key });
+        await loadColumns();
+      } else {
+        throw new Error('Failed to delete column');
+      }
     } catch (error) {
       console.error('Error deleting column:', error);
       toast.error(`Failed to delete column: ${error.message}`);

@@ -64,52 +64,52 @@ export const DEFAULT_COLUMNS = [
 export async function loadColumnConfigurations(projectId, userId) {
   try {
     if (!userId) return DEFAULT_COLUMNS;
-    
+
     // First get the business_id for the user
     const { data: userData, error: userError } = await supabase
       .from('business_users')
       .select('business_id')
       .eq('user_id', userId)
       .single();
-    
+
     if (userError) {
       console.error('Error getting business ID:', userError);
       columnConfigurations.set(DEFAULT_COLUMNS);
       return DEFAULT_COLUMNS;
     }
-    
+
     const businessId = userData?.business_id;
     if (!businessId) {
       columnConfigurations.set(DEFAULT_COLUMNS);
       return DEFAULT_COLUMNS;
     }
-    
-    
+
+
     // Get custom columns from the custom_columns table
     const { data, error } = await supabase
       .from('custom_columns')
       .select('*')
       .eq('business_id', businessId);
-    
+
     if (error) throw error;
-    
+
     // Use the data directly, no need to parse
     const columns = data || [];
-    
+
     // If we got an empty array or no data, use default columns
     if (!columns || columns.length === 0) {
       console.log('No custom columns found, using defaults');
       columnConfigurations.set(DEFAULT_COLUMNS);
       return DEFAULT_COLUMNS;
     }
-    
+
     // Ensure default columns are included
     const defaultColumnKeys = DEFAULT_COLUMNS.map(col => col.column_key);
     const customColumns = columns.filter(col => !defaultColumnKeys.includes(col.column_key));
-    
+
     // Combine default columns with custom columns
     const combinedColumns = [...DEFAULT_COLUMNS, ...customColumns];
-    
+
     // Set the column configurations
     columnConfigurations.set(combinedColumns);
     return combinedColumns;
@@ -137,14 +137,14 @@ export async function addCustomColumn(columnData) {
         created_by: columnData.created_by
       })
       .select();
-    
+
     if (error) throw error;
-    
+
     columnConfigurations.update(configs => {
       const newConfigs = [...configs, data];
       return newConfigs;
     });
-    
+
     return data;
   } catch (error) {
     console.error('Error adding custom column:', error);
@@ -161,9 +161,9 @@ export async function renameCustomColumn(businessId, columnKey, newDisplayName) 
       .eq('business_id', businessId)
       .eq('column_key', columnKey)
       .select();
-    
+
     if (error) throw error;
-    
+
     columnConfigurations.update(configs => {
       return configs.map(col => {
         if (col.business_id === businessId && col.column_key === columnKey) {
@@ -172,7 +172,7 @@ export async function renameCustomColumn(businessId, columnKey, newDisplayName) 
         return col;
       });
     });
-    
+
     return data;
   } catch (error) {
     console.error('Error renaming custom column:', error);
@@ -189,9 +189,9 @@ export async function updateColumnUISettings(businessId, columnKey, uiSettings) 
       .eq('business_id', businessId)
       .eq('column_key', columnKey)
       .select();
-    
+
     if (error) throw error;
-    
+
     columnConfigurations.update(configs => {
       return configs.map(col => {
         if (col.business_id === businessId && col.column_key === columnKey) {
@@ -200,7 +200,7 @@ export async function updateColumnUISettings(businessId, columnKey, uiSettings) 
         return col;
       });
     });
-    
+
     return data;
   } catch (error) {
     console.error('Error updating column UI settings:', error);
@@ -208,21 +208,50 @@ export async function updateColumnUISettings(businessId, columnKey, uiSettings) 
   }
 }
 
-// Delete a custom column
 export async function deleteCustomColumn(businessId, columnKey) {
+
   try {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('custom_columns')
       .delete()
       .eq('business_id', businessId)
       .eq('column_key', columnKey);
-    
-    if (error) throw error;
-    
-    columnConfigurations.update(configs => 
-      configs.filter(c => !(c.business_id === businessId && c.column_key === columnKey))
-    );
-    
+
+    if (error) {
+      console.error('Error deleting column from custom_columns:', error);
+      throw error;
+    }
+
+    columnConfigurations.update(configs => {
+      const filtered = configs.filter(c => !(c.business_id === businessId && c.column_key === columnKey));
+      return filtered;
+    });
+
+
+    try {
+      const { data: cleanupResult, error: cleanupError } = await supabase
+        .rpc('remove_column_from_data', { column_key: columnKey });
+
+      if (cleanupError) {
+        console.error('Error calling remove_column_from_data RPC:', cleanupError);
+        console.error('Error details:', JSON.stringify(cleanupError, null, 2));
+      } else {
+        console.log(`RPC function result:`, cleanupResult);
+        console.log(`Successfully removed ${columnKey} from ${cleanupResult} items`);
+
+        const { data: sampleItems, error: sampleError } = await supabase
+          .from('estimate_items')
+          .select('id, data')
+          .limit(5);
+
+        if (!sampleError && sampleItems) {
+          console.log('Sample items after cleanup:', sampleItems.map(item => ({ id: item.id, data: item.data })));
+        }
+      }
+    } catch (cleanupError) {
+      console.error('Exception when cleaning up column data:', cleanupError);
+    }
+
     return { success: true };
   } catch (error) {
     console.error('Error deleting custom column:', error);
@@ -230,13 +259,12 @@ export async function deleteCustomColumn(businessId, columnKey) {
   }
 }
 
-// Convert column configurations to RevoGrid column format
 export function getGridColumns(configs, options = {}) {
   const { handleDeleteItem, handleCellEdit } = options;
-  
+
   const gridColumns = configs.map(config => {
     const uiSettings = config.ui_settings || {};
-    
+
     const column = {
       prop: config.column_key,
       name: config.display_name,
@@ -248,7 +276,7 @@ export function getGridColumns(configs, options = {}) {
       readonly: (props) => props.model.isTotal || props.model.isSubItem,
       editor: true
     };
-    
+
     if (config.column_type === 'text') {
       column.columnType = 'string';
       // @ts-ignore - RevoGrid accepts string editor types
@@ -259,12 +287,12 @@ export function getGridColumns(configs, options = {}) {
       column.editor = 'number';
     } else if (config.column_type === 'select' || config.column_type === 'multiselect') {
       let optionsArray = [];
-      
+
       if (config.options) {
         try {
           if (typeof config.options === 'string') {
             optionsArray = JSON.parse(config.options);
-          } 
+          }
           else if (Array.isArray(config.options)) {
             optionsArray = config.options;
           }
@@ -278,10 +306,10 @@ export function getGridColumns(configs, options = {}) {
           console.error('Error parsing options:', e);
         }
       }
-      
+
       const formattedOptions = optionsArray.map(opt => {
         let label, value;
-        
+
         if (typeof opt === 'string') {
           label = opt;
           value = opt;
@@ -292,23 +320,23 @@ export function getGridColumns(configs, options = {}) {
           label = String(opt);
           value = opt;
         }
-        
+
         return { label, value };
       });
-      
+
       // @ts-ignore - RevoGrid accepts boolean for editor
       column.editor = true;
-      
+
       column.cellTemplate = (h, props) => {
         const value = props.model[props.prop];
         console.log('Rendering dropdown cell for', props.prop, 'with value:', value);
-        
+
         const option = formattedOptions.find(opt => String(opt.value) === String(value));
         const displayText = option ? option.label : (value || '');
         const handleClick = (e) => {
           e.preventDefault();
           e.stopPropagation();
-          
+
           const dropdown = document.createElement('select');
           dropdown.style.position = 'absolute';
           dropdown.style.zIndex = '1000';
@@ -319,13 +347,13 @@ export function getGridColumns(configs, options = {}) {
           dropdown.style.borderRadius = '4px';
           dropdown.style.backgroundColor = '#fff';
           dropdown.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
-          
+
           // Add a blank option
           const blankOption = document.createElement('option');
           blankOption.value = '';
           blankOption.textContent = '-- Select an option --';
           dropdown.appendChild(blankOption);
-          
+
           // Add all options
           formattedOptions.forEach(opt => {
             const option = document.createElement('option');
@@ -333,14 +361,14 @@ export function getGridColumns(configs, options = {}) {
             option.textContent = opt.label;
             dropdown.appendChild(option);
           });
-          
+
           // Set current value
           dropdown.value = value || '';
-          
+
           const rect = e.target.getBoundingClientRect();
           dropdown.style.left = rect.left + 'px';
           dropdown.style.top = (rect.bottom + 2) + 'px';
-          
+
           dropdown.addEventListener('change', () => {
             const newValue = dropdown.value;
             const grid = document.querySelector('revo-grid');
@@ -348,25 +376,25 @@ export function getGridColumns(configs, options = {}) {
               // @ts-ignore
               grid.setCellValue(props.rowIndex, props.prop, newValue);
             }
-            
+
             document.body.removeChild(dropdown);
           });
-          
+
           const handleOutsideClick = () => {
             if (document.body.contains(dropdown)) {
               document.body.removeChild(dropdown);
             }
             document.removeEventListener('click', handleOutsideClick);
           };
-          
+
           document.body.appendChild(dropdown);
           dropdown.focus();
-          
+
           setTimeout(() => {
             document.addEventListener('click', handleOutsideClick);
           }, 100);
         };
-        
+
         return h('div', {
           class: 'dropdown-cell',
           style: {
@@ -389,23 +417,17 @@ export function getGridColumns(configs, options = {}) {
           }, '▼')
         ]);
       };
-      
-      console.log('Set up custom dropdown editor for column', config.column_key, 'with options:', formattedOptions);
-      
-      // Add debugging to check if the editor is being triggered
-      console.log(`Setting up custom select editor for column ${config.column_key} with options:`, formattedOptions);
-      
+
       // Add a custom cell template to show the dropdown value with an indicator
       column.cellTemplate = (h, props) => {
         const value = props.model[props.prop];
-        console.log('Rendering dropdown cell for', props.prop, 'with value:', value, 'and options:', formattedOptions);
-        
+
         // Use loose equality for comparison and convert both to strings for safer comparison
         const option = formattedOptions.find(opt => String(opt.value) == String(value));
         const displayText = option ? option.label : value;
-        
+
         console.log('Display text for dropdown cell:', displayText);
-        
+
         return h('div', {
           class: 'dropdown-cell',
           style: {
@@ -428,14 +450,14 @@ export function getGridColumns(configs, options = {}) {
           }, '▼')
         ]);
       };
-      
+
     } else if (config.column_type === 'date') {
       // Get date format from UI settings or use default
       const dateFormat = config.ui_settings?.dateFormat || 'yyyy-MM-dd';
       const datePickerType = config.ui_settings?.datePickerType || 'date';
-      
+
       console.log(`Setting up date editor for column ${config.column_key} with format ${dateFormat}`);
-      
+
       // Use a custom date editor function
       // @ts-ignore - RevoGrid accepts function editors
       column.editor = true;
@@ -446,7 +468,7 @@ export function getGridColumns(configs, options = {}) {
           style: { padding: '0.25rem' }
         }, props.model[props.prop] || '');
       };
-      
+
       // Define a custom editor when the cell is being edited
       column.editorComponent = {
         // This is used when the cell is being edited
@@ -456,7 +478,7 @@ export function getGridColumns(configs, options = {}) {
           input.type = datePickerType; // 'date' or 'datetime-local'
           input.className = 'revogr-edit w-full';
           input.value = props.model[props.prop] || '';
-          
+
           // Handle value changes
           input.addEventListener('change', (event) => {
             // Type assertion to access value property
@@ -465,7 +487,7 @@ export function getGridColumns(configs, options = {}) {
               props.onSave(target.value);
             }
           });
-          
+
           return input;
         }
       };
@@ -479,17 +501,17 @@ export function getGridColumns(configs, options = {}) {
     } else {
       column.editor = true; // Default text editor
     }
-    
+
     // Special handling for amount column or unit_price
     if (config.column_key === 'amount' || config.column_key === 'total_amount') {
       column.readonly = (props) => true; // Always readonly
     }
-    
+
     return column;
   });
-  
+
   console.log('Created grid columns:', gridColumns);
-  
+
   // Add actions column
   if (handleDeleteItem) {
     gridColumns.push({
@@ -524,6 +546,6 @@ export function getGridColumns(configs, options = {}) {
       }
     });
   }
-  
+
   return gridColumns;
 }
