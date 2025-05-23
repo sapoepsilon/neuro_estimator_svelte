@@ -84,7 +84,6 @@ export async function loadColumnConfigurations(projectId, userId) {
       return DEFAULT_COLUMNS;
     }
     
-    console.log('Loading columns for business ID:', businessId);
     
     // Get custom columns from the custom_columns table
     const { data, error } = await supabase
@@ -92,13 +91,10 @@ export async function loadColumnConfigurations(projectId, userId) {
       .select('*')
       .eq('business_id', businessId);
     
-    console.log('Business columns response:', { data, error });
-    
     if (error) throw error;
     
     // Use the data directly, no need to parse
     const columns = data || [];
-    console.log('Parsed columns:', columns);
     
     // If we got an empty array or no data, use default columns
     if (!columns || columns.length === 0) {
@@ -113,14 +109,12 @@ export async function loadColumnConfigurations(projectId, userId) {
     
     // Combine default columns with custom columns
     const combinedColumns = [...DEFAULT_COLUMNS, ...customColumns];
-    console.log('Combined columns (default + custom):', combinedColumns);
     
     // Set the column configurations
     columnConfigurations.set(combinedColumns);
     return combinedColumns;
   } catch (error) {
     console.error('Error loading column configurations:', error);
-    // Fall back to default columns
     columnConfigurations.set(DEFAULT_COLUMNS);
     return DEFAULT_COLUMNS;
   }
@@ -129,9 +123,6 @@ export async function loadColumnConfigurations(projectId, userId) {
 // Add a new custom column
 export async function addCustomColumn(columnData) {
   try {
-    console.log('Adding custom column with data:', columnData);
-    
-    // Insert directly into the custom_columns table
     const { data, error } = await supabase
       .from('custom_columns')
       .insert({
@@ -147,16 +138,10 @@ export async function addCustomColumn(columnData) {
       })
       .select();
     
-    console.log('RPC response:', { data, error });
-    
     if (error) throw error;
     
-    // Update store
     columnConfigurations.update(configs => {
-      console.log('Current configs before update:', configs);
-      // Add the new column to the list
       const newConfigs = [...configs, data];
-      console.log('New configs after update:', newConfigs);
       return newConfigs;
     });
     
@@ -170,9 +155,6 @@ export async function addCustomColumn(columnData) {
 // Rename a custom column
 export async function renameCustomColumn(businessId, columnKey, newDisplayName) {
   try {
-    console.log('Renaming column with params:', { businessId, columnKey, newDisplayName });
-    
-    // Update the display_name in the custom_columns table
     const { data, error } = await supabase
       .from('custom_columns')
       .update({ display_name: newDisplayName })
@@ -180,11 +162,8 @@ export async function renameCustomColumn(businessId, columnKey, newDisplayName) 
       .eq('column_key', columnKey)
       .select();
     
-    console.log('Rename column response:', { data, error });
-    
     if (error) throw error;
     
-    // Update store
     columnConfigurations.update(configs => {
       return configs.map(col => {
         if (col.business_id === businessId && col.column_key === columnKey) {
@@ -204,9 +183,6 @@ export async function renameCustomColumn(businessId, columnKey, newDisplayName) 
 // Update column UI settings
 export async function updateColumnUISettings(businessId, columnKey, uiSettings) {
   try {
-    console.log('Updating column UI settings:', { businessId, columnKey, uiSettings });
-    
-    // Update the ui_settings in the custom_columns table
     const { data, error } = await supabase
       .from('custom_columns')
       .update({ ui_settings: uiSettings })
@@ -214,11 +190,8 @@ export async function updateColumnUISettings(businessId, columnKey, uiSettings) 
       .eq('column_key', columnKey)
       .select();
     
-    console.log('Update UI settings response:', { data, error });
-    
     if (error) throw error;
     
-    // Update store
     columnConfigurations.update(configs => {
       return configs.map(col => {
         if (col.business_id === businessId && col.column_key === columnKey) {
@@ -238,20 +211,14 @@ export async function updateColumnUISettings(businessId, columnKey, uiSettings) 
 // Delete a custom column
 export async function deleteCustomColumn(businessId, columnKey) {
   try {
-    console.log('Deleting custom column:', { businessId, columnKey });
-    
-    // Delete from the custom_columns table
     const { data, error } = await supabase
       .from('custom_columns')
       .delete()
       .eq('business_id', businessId)
       .eq('column_key', columnKey);
     
-    console.log('Delete column response:', { data, error });
-    
     if (error) throw error;
     
-    // Update store
     columnConfigurations.update(configs => 
       configs.filter(c => !(c.business_id === businessId && c.column_key === columnKey))
     );
@@ -267,14 +234,9 @@ export async function deleteCustomColumn(businessId, columnKey) {
 export function getGridColumns(configs, options = {}) {
   const { handleDeleteItem, handleCellEdit } = options;
   
-  console.log('Creating grid columns from configs:', configs);
-  
-  // Map column configurations to grid columns
   const gridColumns = configs.map(config => {
-    // Extract UI settings with fallbacks
     const uiSettings = config.ui_settings || {};
     
-    // Base column properties
     const column = {
       prop: config.column_key,
       name: config.display_name,
@@ -284,12 +246,9 @@ export function getGridColumns(configs, options = {}) {
       sortable: uiSettings.sortable !== false,
       filter: uiSettings.filter !== false,
       readonly: (props) => props.model.isTotal || props.model.isSubItem,
-      // Make sure all columns have an editor by default
-      // Using any type to accommodate both boolean and string values
       editor: true
     };
     
-    // Add type-specific properties
     if (config.column_type === 'text') {
       column.columnType = 'string';
       // @ts-ignore - RevoGrid accepts string editor types
@@ -320,8 +279,6 @@ export function getGridColumns(configs, options = {}) {
         }
       }
       
-      console.log(`Setting up dropdown options for column ${config.column_key}:`, optionsArray);
-      
       const formattedOptions = optionsArray.map(opt => {
         let label, value;
         
@@ -339,29 +296,19 @@ export function getGridColumns(configs, options = {}) {
         return { label, value };
       });
       
-      console.log('Formatted dropdown options:', formattedOptions);
-      
-      // Use a simple approach - just set editor to true to make it editable
       // @ts-ignore - RevoGrid accepts boolean for editor
       column.editor = true;
       
-      // Add a custom cell template to show the dropdown value with an indicator
       column.cellTemplate = (h, props) => {
         const value = props.model[props.prop];
         console.log('Rendering dropdown cell for', props.prop, 'with value:', value);
         
-        // Find the matching option to display the label
         const option = formattedOptions.find(opt => String(opt.value) === String(value));
         const displayText = option ? option.label : (value || '');
-        
-        // Create a click handler to open a custom dropdown
         const handleClick = (e) => {
           e.preventDefault();
           e.stopPropagation();
           
-          console.log('Dropdown cell clicked, showing options:', formattedOptions);
-          
-          // Create a dropdown element
           const dropdown = document.createElement('select');
           dropdown.style.position = 'absolute';
           dropdown.style.zIndex = '1000';
@@ -390,27 +337,21 @@ export function getGridColumns(configs, options = {}) {
           // Set current value
           dropdown.value = value || '';
           
-          // Position the dropdown
           const rect = e.target.getBoundingClientRect();
           dropdown.style.left = rect.left + 'px';
           dropdown.style.top = (rect.bottom + 2) + 'px';
           
-          // Handle change
           dropdown.addEventListener('change', () => {
             const newValue = dropdown.value;
-            console.log('Selected new value:', newValue);
-            
-            // Update the cell value
             const grid = document.querySelector('revo-grid');
             if (grid) {
+              // @ts-ignore
               grid.setCellValue(props.rowIndex, props.prop, newValue);
             }
             
-            // Remove the dropdown
             document.body.removeChild(dropdown);
           });
           
-          // Handle outside click
           const handleOutsideClick = () => {
             if (document.body.contains(dropdown)) {
               document.body.removeChild(dropdown);
@@ -418,17 +359,14 @@ export function getGridColumns(configs, options = {}) {
             document.removeEventListener('click', handleOutsideClick);
           };
           
-          // Add to DOM
           document.body.appendChild(dropdown);
           dropdown.focus();
           
-          // Set up outside click handler (delayed to avoid immediate trigger)
           setTimeout(() => {
             document.addEventListener('click', handleOutsideClick);
           }, 100);
         };
         
-        // Return the cell with dropdown indicator
         return h('div', {
           class: 'dropdown-cell',
           style: {
@@ -442,9 +380,7 @@ export function getGridColumns(configs, options = {}) {
           },
           onClick: handleClick
         }, [
-          // Text content
           h('span', {}, displayText),
-          // Dropdown indicator
           h('span', {
             style: {
               color: '#666',

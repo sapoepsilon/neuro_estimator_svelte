@@ -3,14 +3,12 @@ import { supabase } from '$lib/supabase';
 import { toast } from 'svelte-sonner';
 import { user } from './authStore';
 
-// Create a writable store for the business ID
 export const businessId = writable<string | null>(null);
 
-// Define User interface based on Supabase Auth user structure
 interface User {
   id: string;
   email?: string;
-  [key: string]: any; // Allow for other properties
+  [key: string]: any; 
 }
 
 /**
@@ -19,7 +17,6 @@ interface User {
  */
 export async function getBusinessId(): Promise<string | null> {
   try {
-    // Get the current user value from the store
     let currentUser: User | null = null;
     const unsubscribe = user.subscribe(value => {
       currentUser = value as User | null;
@@ -38,7 +35,6 @@ export async function getBusinessId(): Promise<string | null> {
     
     if (error) throw error;
     
-    // Set the business ID in the store
     const id = data.business_id;
     businessId.set(id);
     

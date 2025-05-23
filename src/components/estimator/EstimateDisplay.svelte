@@ -515,7 +515,6 @@
 
   async function handleCellEdit(editEvent) {
     // Add an alert to confirm function is being called
-    alert('Cell edit detected!');
     
     try {
       console.log(`handleCellEdit: ${JSON.stringify(editEvent)}`);

@@ -2,11 +2,8 @@
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "$lib/components/ui/dialog";
-  import { Label } from "$lib/components/ui/label";
-  import { Textarea } from "$lib/components/ui/textarea";
   import { createEventDispatcher } from 'svelte';
   import { toast } from "svelte-sonner";
-  import { writable } from "svelte/store";
   import { user } from '../../stores/authStore';
   import { getBusinessId } from '../../stores/userStore';
   import { supabase } from '$lib/supabase';
@@ -27,13 +24,6 @@
   let editMode = false;
   let businessId = null;
   
-  // For dropdown options
-  let dropdownOptions = "";
-  let dropdownOptionsList = [];
-  
-  let dateFormat = "yyyy-MM-dd";
-  let datePickerType = "date"; 
-
   // Column type options
   const columnTypes = [
     { value: "text", label: "Text" },
@@ -65,7 +55,6 @@
   async function fetchBusinessIdAndLoadColumns() {
     try {
       businessId = await getBusinessId();
-      console.log('Fetched business ID:', businessId);
       
       if (businessId) {
         await loadColumns();
@@ -77,12 +66,10 @@
   
 
   
-  // Load columns for the business
   async function loadColumns() {
     if (!businessId) return;
     
     try {
-      // Get custom columns directly from the table
       const { data, error } = await supabase
         .from('custom_columns')
         .select('*')
@@ -90,11 +77,8 @@
       
       if (error) throw error;
       
-      // Use the data directly for custom columns
       const customColumns = data || [];
-      console.log('Loaded custom columns:', customColumns);
       
-      // Create default column objects
       const defaultColumnsObjects = defaultColumns.map(key => ({
         column_key: key,
         display_name: key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' '),
@@ -103,14 +87,10 @@
         is_default: true
       }));
       
-      // Combine default columns with custom columns
       const allColumns = [...defaultColumnsObjects, ...customColumns];
-      console.log('Combined columns (default + custom):', allColumns);
       
-      // Update the column configurations
       columnConfigurations = allColumns;
       
-      // Also dispatch the event for parent components
       dispatch('columnsLoaded', allColumns);
     } catch (error) {
       console.error('Error loading columns:', error);
@@ -119,37 +99,23 @@
   }
 
   function resetForm() {
-    console.log('Resetting form');
     newColumnName = "";
     newColumnType = "text";
     newColumnKey = "";
     editingColumn = null;
     editMode = false;
-    
-    // Reset dropdown options
-    dropdownOptions = "";
-    dropdownOptionsList = [];
-    
-    // Reset date format
-    dateFormat = "yyyy-MM-dd";
-    datePickerType = "date";
-    
-    console.log('Form reset, editMode is now:', editMode);
   }
 
   function generateColumnKey(name) {
-    // Generate a unique key based on name and timestamp
     const baseKey = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
     const timestamp = new Date().getTime();
     const uniqueKey = `${baseKey}_${timestamp}`;
-    console.log('Generated unique column key:', uniqueKey);
     return uniqueKey;
   }
 
   function handleNameChange() {
     if (!editMode) {
       newColumnKey = generateColumnKey(newColumnName);
-      console.log('Column key updated to:', newColumnKey);
     }
   }
 
@@ -162,16 +128,6 @@
   }
 
   async function saveColumn() {
-    console.log('saveColumn function called with:', { 
-      newColumnName, 
-      newColumnType, 
-      newColumnKey, 
-      businessId, 
-      editMode, 
-      editingColumn 
-    });
-    
-    // Add a visible notification instead of an alert
     toast.info('Processing column save request...');
     
     if (!newColumnName.trim()) {
@@ -190,8 +146,6 @@
       let result;
 
       if (editMode && editingColumn) {
-        console.log('Renaming column:', editingColumn);
-        // Update existing column (rename) using direct table operation
         const { data, error } = await supabase
           .from('custom_columns')
           .update({ display_name: newColumnName })
@@ -201,69 +155,23 @@
         
         if (error) throw error;
         result = data[0];
-        console.log('Column renamed result:', result);
         toast.success("Column renamed successfully");
       } else {
-        // Make sure we have a valid column key
         if (!newColumnKey || newColumnKey.trim() === '') {
           newColumnKey = generateColumnKey(newColumnName);
-          console.log('Generated new column key:', newColumnKey);
         }
         
-        console.log('Adding new column with name:', newColumnName, 'key:', newColumnKey, 'type:', newColumnType);
-        
-        // Create UI settings object
         const uiSettings = {
           width: 150,
           minSize: 80,
           maxSize: 300,
           sortable: true,
           filter: true,
-          
-          // Add column type specific settings
-          ...(newColumnType === 'date' && {
-            dateFormat: dateFormat,
-            datePickerType: datePickerType
-          }),
-          order: 999 // High number to put it at the end
+          order: 999 
         };
         
-        // Prepare options for dropdown if applicable
         let columnOptions = null;
-        if (newColumnType === 'select') {
-          if (dropdownOptionsList.length > 0) {
-            // Convert options to the format expected by the database
-            // Use a slugified version of the option as the value to ensure it's safe for storage
-            columnOptions = dropdownOptionsList.map((option, index) => {
-              // Create a value that's guaranteed to be unique and valid
-              const value = option.toLowerCase().replace(/[^a-z0-9]/g, '_') || `option_${index+1}`;
-              return {
-                label: option,
-                value: value
-              };
-            });
-            console.log('Saving dropdown options:', columnOptions);
-          } else {
-            // Show warning if no options were provided
-            toast.warning('No dropdown options provided. Adding default options.');
-            // Provide some default options
-            columnOptions = [
-              { label: 'Option 1', value: 'option_1' },
-              { label: 'Option 2', value: 'option_2' },
-              { label: 'Option 3', value: 'option_3' }
-            ];
-          }
-        }
         
-        console.log('Inserting new column with parameters:', {
-          business_id: businessId,
-          column_key: newColumnKey,
-          display_name: newColumnName,
-          column_type: newColumnType,
-          options: columnOptions
-        });
-        
-        // Get current user from store
         const currentUser = $user;
         const userId = currentUser?.id;
         
@@ -282,24 +190,16 @@
           })
           .select();
         
-        console.log('RPC call completed, response:', { data, error });
         
-        // Set result to the response data
         result = data;
         
-        console.log('Column added result:', result);
         toast.success("Column added successfully");
       }
-
-      // Update local data
-      console.log('Dispatching columnSaved event with result:', result);
       dispatch('columnSaved', result);
       resetForm();
       
-      // Reload column configurations
       await loadColumns();
       
-      // Close the dialog to trigger a refresh in the parent component
       closeDialog();
     } catch (error) {
       console.error('Error saving column:', error);
@@ -310,7 +210,6 @@
   }
 
   async function deleteColumn(column) {
-    // Don't allow deletion of default columns
     if (defaultColumns.includes(column.column_key)) {
       toast.error("Default columns cannot be deleted");
       return;
@@ -323,7 +222,6 @@
     isLoading = true;
 
     try {
-      // Delete the custom column using direct table operation
       const { data, error } = await supabase
         .from('custom_columns')
         .delete()
@@ -335,7 +233,6 @@
       toast.success("Column deleted successfully");
       dispatch('columnDeleted', { businessId, columnKey: column.column_key });
       
-      // Reload column configurations
       await loadColumns();
     } catch (error) {
       console.error('Error deleting column:', error);
@@ -346,10 +243,7 @@
   }
 
   function closeDialog() {
-    console.log('closeDialog function called');
-    // Set isOpen to false to close the dialog
     isOpen = false;
-    // Also dispatch the close event for any parent components
     dispatch('close');
     dispatch('dialogClosed');
   }
@@ -393,84 +287,13 @@
             </select>
           </div>
         </div>
-        
-        <!-- Dropdown options configuration (only shown for select type) -->
-        {#if newColumnType === 'select'}
-          <div class="mt-4">
-            <label for="dropdown-options" class="block text-sm font-medium mb-1">Dropdown Options</label>
-            <div class="text-xs text-gray-500 mb-2">Enter one option per line or comma-separated values</div>
-            <Textarea
-              id="dropdown-options"
-              bind:value={dropdownOptions}
-              placeholder="Option 1\nOption 2\nOption 3"
-              class="w-full h-24"
-              on:input={() => {
-                // Parse options from textarea
-                if (dropdownOptions.includes('\n')) {
-                  // Split by newline
-                  dropdownOptionsList = dropdownOptions.split('\n')
-                    .map(opt => opt.trim())
-                    .filter(opt => opt.length > 0);
-                } else {
-                  // Split by comma
-                  dropdownOptionsList = dropdownOptions.split(',')
-                    .map(opt => opt.trim())
-                    .filter(opt => opt.length > 0);
-                }
-              }}
-            />
-            
-            <!-- Preview of parsed options -->
-            {#if dropdownOptionsList.length > 0}
-              <div class="mt-2">
-                <div class="text-sm font-medium mb-1">Preview:</div>
-                <div class="flex flex-wrap gap-2">
-                  {#each dropdownOptionsList as option}
-                    <div class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">{option}</div>
-                  {/each}
-                </div>
-              </div>
-            {/if}
-          </div>
-        {/if}
-        
-        <!-- Date field configuration -->
-        {#if newColumnType === 'date'}
-          <div class="mt-4">
-            <label for="date-format" class="block text-sm font-medium mb-1">Date Format</label>
-            <select 
-              id="date-format" 
-              bind:value={dateFormat}
-              class="w-full px-3 py-2 border rounded-md mb-2"
-            >
-              <option value="yyyy-MM-dd">YYYY-MM-DD</option>
-              <option value="MM/dd/yyyy">MM/DD/YYYY</option>
-              <option value="dd/MM/yyyy">DD/MM/YYYY</option>
-              <option value="yyyy-MM-dd HH:mm">YYYY-MM-DD HH:MM</option>
-            </select>
-            
-            <label for="date-picker-type" class="block text-sm font-medium mb-1">Date Picker Type</label>
-            <select 
-              id="date-picker-type" 
-              bind:value={datePickerType}
-              class="w-full px-3 py-2 border rounded-md"
-            >
-              <option value="date">Date Only</option>
-              <option value="datetime-local">Date and Time</option>
-            </select>
-          </div>
-        {/if}
         <div class="flex justify-end">
-          <!-- Always show the Cancel button when in edit mode -->
           {#if editMode}
-            <Button variant="outline" class="mr-2" on:click={() => { console.log('reset form!'); resetForm(); }}>Cancel</Button>
+            <Button variant="outline" class="mr-2" on:click={resetForm}>Cancel</Button>
           {/if}
-          
-          <!-- Simple button with minimal code for debugging -->
           <button 
             type="button"
             on:click={() => {
-              console.log('ADD COLUMN BUTTON CLICKED!');
               toast.info('Add Column button clicked!');
               saveColumn();
             }}
