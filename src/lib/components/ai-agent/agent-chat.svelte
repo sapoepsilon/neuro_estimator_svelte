@@ -403,7 +403,8 @@
             prompt: messageWithRanges,
             userId: $user?.id,
             conversationId: internalConversationId,
-            ranges: rangeReferences.length > 0 ? rangeReferences.map(ref => ref.range) : undefined
+            ranges: rangeReferences.length > 0 ? rangeReferences.map(ref => ref.range) : undefined,
+            useMcp: true
           })
         });
         

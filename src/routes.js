@@ -5,8 +5,11 @@ import AuthCallback from "./components/auth/AuthCallback.svelte";
 
 // Define routes
 const routes = {
-  // Home page - shows the EstimateDisplay component
-  "/": Home,
+  // Home page - shows the EstimatorFormWrapper component by default
+  "/": EstimatorFormWrapper,
+
+  // Home page (for backwards compatibility)
+  "/home": Home,
 
   // Estimator form page
   "/estimator": EstimatorFormWrapper,
