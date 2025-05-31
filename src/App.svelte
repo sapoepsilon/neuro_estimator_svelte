@@ -137,16 +137,18 @@
         </button>
         <Navbar openLoginDialog={openLoginDialog} />
       </div>
-      <main class="flex-1 overflow-auto">
-        <Router {routes} />
-      </main>
+      <div class="flex-1 flex overflow-hidden">
+        <main class="flex-1 overflow-auto">
+          <Router {routes} />
+        </main>
+        <AiSidebar 
+          bind:open={showAiSidebar} 
+          bind:projectId={aiSidebarProjectId} 
+          bind:projectName={aiSidebarProjectName} 
+          bind:this={aiSidebarComponent}
+        />
+      </div>
     </div>
-    <AiSidebar 
-      bind:open={showAiSidebar} 
-      bind:projectId={aiSidebarProjectId} 
-      bind:projectName={aiSidebarProjectName} 
-      bind:this={aiSidebarComponent}
-    />
   </div>
 
 

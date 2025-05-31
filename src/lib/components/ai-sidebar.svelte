@@ -65,10 +65,75 @@
   $: if (open && projectId) {
     fetchLatestConversation();
   }
+  
+  // Close sidebar if user is not authenticated
+  $: if (open && !$user) {
+    close();
+  }
 </script>
 
+<!-- Desktop: Side-by-side layout (not fixed) -->
+{#if open}
 <div 
-  class="h-full flex flex-col border-l bg-background transition-all duration-300 ease-in-out fixed z-40 right-0 top-0 bottom-0 w-[90vw] sm:w-[350px] max-w-[350px]" 
+  class="h-full flex-col border-l bg-background transition-all duration-300 ease-in-out w-[350px] flex-shrink-0 hidden md:flex"
+>
+  <div class="p-3 sm:p-4 border-b flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <MessageSquare class="h-5 w-5" />
+      <h2 class="text-lg font-semibold truncate">AI Estimating Agent</h2>
+    </div>
+    <div class="flex items-center gap-2">
+      <button 
+        class="p-1.5 rounded-md hover:bg-slate-100 active:bg-slate-200 dark:hover:bg-slate-800" 
+        on:click={close}
+        aria-label="Close AI sidebar"
+      >
+        <X class="h-5 w-5" />
+      </button>
+    </div>
+  </div>
+  
+  <div class="flex-1 overflow-hidden">
+    {#if isLoading}
+      <div class="flex items-center justify-center h-full">
+        <p class="text-sm text-muted-foreground">Loading conversation...</p>
+      </div>
+    {:else if error}
+      <div class="flex items-center justify-center h-full p-4">
+        <div class="p-3 rounded-lg bg-destructive text-destructive-foreground max-w-[80%]">
+          <p class="text-sm">Error: {error}</p>
+          <button 
+            class="mt-2 text-xs underline"
+            on:click={fetchLatestConversation}
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    {:else}
+      <AgentChat 
+        projectId={projectId}
+        projectName={projectName}
+        conversationId={latestConversation?.id}
+        on:aiResponseSuccess={(event) => {
+          // Dispatch a global event to notify that the AI agent has responded successfully
+          window.dispatchEvent(new CustomEvent('aiEstimateUpdated', {
+            detail: {
+              projectId: event.detail.projectId,
+              estimateId: event.detail.estimateId,
+              responseData: event.detail.responseData
+            }
+          }));
+        }}
+      />
+    {/if}
+  </div>
+</div>
+{/if}
+
+<!-- Mobile: Overlay layout -->
+<div 
+  class="md:hidden h-full flex flex-col border-l bg-background transition-all duration-300 ease-in-out fixed z-40 right-0 top-0 bottom-0 w-[90vw] sm:w-[350px] max-w-[350px]" 
   class:translate-x-full={!open}
   class:translate-x-0={open}
 >

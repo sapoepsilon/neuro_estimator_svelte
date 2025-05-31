@@ -264,7 +264,7 @@
     <div class="bg-red-50 text-red-700 p-4 rounded-md mb-4">
       <p>{error}</p>
     </div>
-  {:else if projectId && estimateItems.length > 0}
+  {:else if projectId && estimateItems.length > 0 && $user}
     <div class="relative">
       <EstimateDisplay 
         bind:this={estimateDisplayComponent}
@@ -297,10 +297,10 @@
     <div class="relative">
       <EstimatorForm projectId={projectId} projectData={project} />
       
-      {#if projectId}
+      {#if projectId && $user}
         {#if !isAiSidebarVisible}
         <div class="fixed bottom-6 right-6 flex flex-col items-end space-y-2 z-[999]" style="pointer-events: auto;">
-          <div class="bg-white dark:bg-gray-800 text-xs text-gray-500 dark:text-gray-400 p-2 rounded-md shadow-md flex items-center mb-2">
+          <div class="hidden md:block bg-white dark:bg-gray-800 text-xs text-gray-500 dark:text-gray-400 p-2 rounded-md shadow-md flex items-center mb-2">
             <Keyboard class="h-3 w-3 mr-1" />
             <span>Ctrl+K</span>
           </div>
