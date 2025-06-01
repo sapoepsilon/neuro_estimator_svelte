@@ -4,6 +4,8 @@
   import { supabase } from "$lib/supabase";
   import { user } from "../../../stores/authStore";
   import { gridData, currentProjectId } from "../../../stores/gridStore";
+  import { selectedRange as selectedRangeStore } from "../../../stores/rangeSelectionStore";
+  import { messageInput } from "../../../stores/messageInputStore";
   import { API_AGENT_PROMPT_URL } from '../ui/sidebar/constants';
   import EstimateResponseCard from './estimate-response-card.svelte';
   
@@ -37,7 +39,6 @@
   let isApiLoading = false; // Track API request loading state
   let loadError: string | null = null;
   
-  let newMessage = '';
   let chatContainer: HTMLElement;
   
   // XML response handling
@@ -71,7 +72,7 @@
     rangeSelectionComplete = false;
     
     const cursorPos = (document.activeElement as HTMLInputElement).selectionStart || 0;
-    const textBeforeCursor = newMessage.substring(0, cursorPos);
+    const textBeforeCursor = $messageInput.substring(0, cursorPos);
     const lastAt = textBeforeCursor.lastIndexOf('@');
     
     if (lastAt !== -1) {
@@ -97,17 +98,17 @@
     
     // Find the position of the @ symbol we're replacing
     const cursorPos = (document.activeElement as HTMLInputElement)?.selectionStart || 0;
-    const textBeforeCursor = newMessage.substring(0, cursorPos);
+    const textBeforeCursor = $messageInput.substring(0, cursorPos);
     const lastAt = textBeforeCursor.lastIndexOf('@');
     
     if (lastAt !== -1) {
       // Replace the entire @... text with our formatted range
-      const beforeAt = newMessage.substring(0, lastAt);
-      const afterRange = newMessage.substring(lastAt).replace(/^@[^\s]*/, '');
-      newMessage = `${beforeAt}${rangeText}${afterRange}`;
+      const beforeAt = $messageInput.substring(0, lastAt);
+      const afterRange = $messageInput.substring(lastAt).replace(/^@[^\s]*/, '');
+      $messageInput = `${beforeAt}${rangeText}${afterRange}`;
     } else {
       // No @ found, just append to the end
-      newMessage += rangeText;
+      $messageInput += rangeText;
     }
     
     // Hide suggestions
@@ -157,7 +158,7 @@
       showRangeSuggestions = true;
       event.preventDefault();
       // Add @ to the input
-      newMessage = newMessage + '@';
+      $messageInput = $messageInput + '@';
       // Focus the range input
       setTimeout(() => {
         const rangeInputEl = document.getElementById('range-input');
@@ -280,14 +281,14 @@
   
   // Function to send message to AI agent
   async function sendMessage() {
-    if (!newMessage.trim() || !$user) return;
+    if (!$messageInput.trim() || !$user) return;
     
     // Hide range suggestions if visible
     showRangeSuggestions = false;
     
     // Check for range references in the message
     const rangeReferences: Array<{range: {start: number, end: number}, text: string}> = [];
-    const messageWithRanges = newMessage.replace(/@(\d+)(?:-(\d+))?/g, (match, start, end) => {
+    const messageWithRanges = $messageInput.replace(/@(\d+)(?:-(\d+))?/g, (match, start, end) => {
       const range = {
         start: parseInt(start, 10),
         end: end ? parseInt(end, 10) : parseInt(start, 10)
@@ -298,7 +299,7 @@
     });
     
     // Add user message to chat with formatted ranges
-    let displayMessage = newMessage;
+    let displayMessage = $messageInput;
     rangeReferences.forEach(ref => {
       displayMessage = displayMessage.replace(
         `@${ref.range.start}-${ref.range.end}`, 
@@ -314,8 +315,8 @@
     messages = [...messages, userMessage];
     
     // Clear input
-    const messageContent = newMessage;
-    newMessage = '';
+    const messageContent = $messageInput;
+    $messageInput = '';
     
     // Scroll to bottom
     setTimeout(() => {
@@ -514,7 +515,7 @@
         
         // Get the text after @ to check for range format
         const cursorPos = (event.target as HTMLInputElement)?.selectionStart || 0;
-        const textBeforeCursor = newMessage.substring(0, cursorPos);
+        const textBeforeCursor = $messageInput.substring(0, cursorPos);
         const lastAt = textBeforeCursor.lastIndexOf('@');
         
         if (lastAt !== -1) {
@@ -527,10 +528,10 @@
             
             if (!isNaN(start) && !isNaN(end)) {
               // Replace the current @text with the properly formatted range
-              const beforeAt = newMessage.substring(0, lastAt);
-              const afterRange = newMessage.substring(lastAt + textAfterAt.length + 1);
+              const beforeAt = $messageInput.substring(0, lastAt);
+              const afterRange = $messageInput.substring(lastAt + textAfterAt.length + 1);
               const rangeText = `@${start}-${end}`;
-              newMessage = `${beforeAt}${rangeText}${afterRange}`;
+              $messageInput = `${beforeAt}${rangeText}${afterRange}`;
               
               // Mark range selection as complete
               rangeSelectionComplete = true;
@@ -557,6 +558,42 @@
   $: if (conversationId !== internalConversationId) {
     internalConversationId = conversationId;
     loadConversationHistory();
+  }
+  
+  // Handle incoming range selections from EstimateDisplay
+  $: if ($selectedRangeStore) {
+    const isMobile = window.innerWidth < 768;
+    console.log('AgentChat received range:', $selectedRangeStore, 'Component instance for:', isMobile ? 'mobile' : 'desktop');
+    
+    // Only process if this is the currently visible component
+    const isVisible = isMobile ? 
+      document.querySelector('[data-testid="ai-sidebar-mobile"]')?.classList.contains('translate-x-0') :
+      !document.querySelector('[data-testid="ai-sidebar-mobile"]')?.classList.contains('translate-x-0');
+    
+    console.log('Component is visible:', isVisible);
+    
+    if (isVisible) {
+      // Append to existing message instead of overwriting
+      if ($messageInput.trim() === '') {
+        $messageInput = $selectedRangeStore + ' ';
+      } else {
+        $messageInput = $messageInput.trim() + ' ' + $selectedRangeStore + ' ';
+      }
+      console.log('Updated messageInput to:', $messageInput, 'for', isMobile ? 'mobile' : 'desktop');
+      
+      // Clear the store after use (only the active component should clear it)
+      selectedRangeStore.set(null);
+      
+      // Focus on the input field and position cursor at the end
+      setTimeout(() => {
+        const input = document.querySelector('input[placeholder="Type your message..."]') as HTMLInputElement;
+        if (input) {
+          input.focus();
+          input.setSelectionRange(input.value.length, input.value.length);
+          console.log('Focused input field successfully');
+        }
+      }, 100);
+    }
   }
 </script>
 
@@ -627,7 +664,7 @@
         type="text"
         class="w-full p-2 pr-10 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
         placeholder="Type your message..."
-        bind:value={newMessage}
+        bind:value={$messageInput}
         on:keydown={handleKeydown}
           on:input={(e) => {
           // If a range selection was completed, don't show suggestions until a new @ is typed
@@ -637,7 +674,7 @@
             const cursorPos = input.selectionStart || 0;
             
             // If the user just typed @, allow new suggestions
-            if (cursorPos > 0 && newMessage.charAt(cursorPos - 1) === '@') {
+            if (cursorPos > 0 && $messageInput.charAt(cursorPos - 1) === '@') {
               rangeSelectionComplete = false;
             } else {
               return;
@@ -645,7 +682,7 @@
           }
           
           // Check if @ was typed
-          if (newMessage.includes('@') && !showRangeSuggestions) {
+          if ($messageInput.includes('@') && !showRangeSuggestions) {
             handleAtKey();
             return;
           }
@@ -653,7 +690,7 @@
           // Handle input while range suggestions are shown
           if (showRangeSuggestions) {
             const cursorPos = (e.target as HTMLInputElement).selectionStart || 0;
-            const textBeforeCursor = newMessage.substring(0, cursorPos);
+            const textBeforeCursor = $messageInput.substring(0, cursorPos);
             const lastAt = textBeforeCursor.lastIndexOf('@');
             
             if (lastAt === -1) {
@@ -693,15 +730,15 @@
                on:mousedown|preventDefault={() => {
                  // Find the @ symbol in the message
                  const cursorPos = (document.activeElement as HTMLInputElement)?.selectionStart || 0;
-                 const textBeforeCursor = newMessage.substring(0, cursorPos);
+                 const textBeforeCursor = $messageInput.substring(0, cursorPos);
                  const lastAt = textBeforeCursor.lastIndexOf('@');
                  
                  if (lastAt !== -1) {
                    // Replace the entire @... text with our formatted range
-                   const beforeAt = newMessage.substring(0, lastAt);
-                   const afterAt = newMessage.substring(lastAt).replace(/^@[^\s]*/, '');
+                   const beforeAt = $messageInput.substring(0, lastAt);
+                   const afterAt = $messageInput.substring(lastAt).replace(/^@[^\s]*/, '');
                    const rangeText = `@${item.row}`;
-                   newMessage = `${beforeAt}${rangeText}${afterAt}`;
+                   $messageInput = `${beforeAt}${rangeText}${afterAt}`;
                    showRangeSuggestions = false;
                    
                    // Mark range selection as complete
@@ -726,7 +763,7 @@
               on:mousedown|preventDefault={() => {
                 // Find the @ symbol in the message
                 const cursorPos = (document.activeElement as HTMLInputElement)?.selectionStart || 0;
-                const textBeforeCursor = newMessage.substring(0, cursorPos);
+                const textBeforeCursor = $messageInput.substring(0, cursorPos);
                 const lastAt = textBeforeCursor.lastIndexOf('@');
                 
                 if (lastAt !== -1) {
@@ -734,10 +771,10 @@
                   const [start, end] = rangeInput.split('-').map(Number);
                   if (!isNaN(start) && !isNaN(end || start)) {
                     // Replace the entire @... text with our formatted range
-                    const beforeAt = newMessage.substring(0, lastAt);
-                    const afterAt = newMessage.substring(lastAt).replace(/^@[^\s]*/, '');
+                    const beforeAt = $messageInput.substring(0, lastAt);
+                    const afterAt = $messageInput.substring(lastAt).replace(/^@[^\s]*/, '');
                     const rangeText = `@${start}-${end || start}`;
-                    newMessage = `${beforeAt}${rangeText}${afterAt}`;
+                    $messageInput = `${beforeAt}${rangeText}${afterAt}`;
                     showRangeSuggestions = false;
                     
                     // Mark range selection as complete
@@ -749,7 +786,7 @@
                 if (e.key === 'Enter') {
                   // Find the @ symbol in the message
                   const cursorPos = (document.activeElement as HTMLInputElement)?.selectionStart || 0;
-                  const textBeforeCursor = newMessage.substring(0, cursorPos);
+                  const textBeforeCursor = $messageInput.substring(0, cursorPos);
                   const lastAt = textBeforeCursor.lastIndexOf('@');
                   
                   if (lastAt !== -1) {
@@ -757,9 +794,9 @@
                     const [start, end] = rangeInput.split('-').map(Number);
                     if (!isNaN(start) && !isNaN(end || start)) {
                       // Replace the entire @... text with our formatted range
-                      const beforeAt = newMessage.substring(0, lastAt);
-                      const afterAt = newMessage.substring(lastAt).replace(/^@[^\s]*/, '');
-                      newMessage = `${beforeAt}@${start}-${end || start}${afterAt}`;
+                      const beforeAt = $messageInput.substring(0, lastAt);
+                      const afterAt = $messageInput.substring(lastAt).replace(/^@[^\s]*/, '');
+                      $messageInput = `${beforeAt}@${start}-${end || start}${afterAt}`;
                       showRangeSuggestions = false;
                     }
                   }
@@ -777,7 +814,7 @@
         <button 
           class="absolute right-2 top-1/2 transform -translate-y-1/2 inline-flex items-center justify-center h-8 w-8 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
           on:click={sendMessage}
-          disabled={!newMessage.trim() || isApiLoading}
+          disabled={!$messageInput.trim() || isApiLoading}
         >
           {#if isApiLoading}
             <Loader2 class="h-5 w-5 animate-spin" />

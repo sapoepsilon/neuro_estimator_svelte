@@ -194,16 +194,12 @@
     if (stage === 'request') {
       statusMessage = 'Sending request to AI model...';
     } else if (stage === 'streaming') {
-      statusMessage = `AI generating estimate... ${chunkCount} chunks received`;
-      if (accumulatedLength) {
-        statusMessage += ` (${accumulatedLength} characters)`;
-      }
+      statusMessage = `AI generating estimate...`;
     } else if (message) {
-      // Fallback to message if no specific stage
       const match = message.match(/(\d+)/);
       if (match) {
         chunkCount = parseInt(match[1]);
-        statusMessage = `AI generating estimate... ${chunkCount} chunks processed`;
+        statusMessage = `AI generating estimate...`;
       } else {
         statusMessage = message;
       }
@@ -472,9 +468,6 @@
           
           <div>
             <p class="font-medium text-gray-900">{statusMessage}</p>
-            {#if chunkCount > 0}
-              <p class="text-sm text-gray-600">{chunkCount} chunks processed</p>
-            {/if}
           </div>
         </div>
 

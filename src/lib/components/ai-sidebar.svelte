@@ -70,6 +70,7 @@
   $: if (open && !$user) {
     close();
   }
+  
 </script>
 
 <!-- Desktop: Side-by-side layout (not fixed) -->

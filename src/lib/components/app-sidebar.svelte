@@ -93,7 +93,21 @@
         sidebarVisible = false;
       }
     } else if (wasMobile && !isMobile) {
+      // Transitioning from mobile to desktop
       sidebarVisible = true;
+      // Restore the saved desktop width
+      const savedWidth = localStorage.getItem(STORAGE_KEY);
+      const savedCollapsed = localStorage.getItem(COLLAPSED_STORAGE_KEY);
+      
+      if (savedCollapsed === 'true') {
+        collapsed = true;
+        widthPx = 64;
+      } else if (savedWidth) {
+        widthPx = parseInt(savedWidth, 10);
+      } else {
+        widthPx = 250; // Default desktop width
+      }
+      width = `${widthPx}px`;
     }
   }
   
@@ -286,6 +300,24 @@
   });
 </script>
 
+<style>
+  /* Ensure smooth hardware-accelerated transitions on mobile */
+  @media (max-width: 768px) {
+    div[style*="transform"] {
+      will-change: transform;
+      -webkit-transform: translateZ(0);
+      transform: translateZ(0);
+      -webkit-backface-visibility: hidden;
+      backface-visibility: hidden;
+    }
+  }
+  
+  /* Prevent partial visibility states */
+  .pointer-events-none {
+    pointer-events: none;
+  }
+</style>
+
 {#if isMobile && sidebarVisible}
   <div 
     class="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 transition-opacity duration-300 ease-in-out"
@@ -299,7 +331,8 @@
 
 <div 
   class="h-full flex flex-col border-r bg-background shadow-lg {isResizing ? '' : 'transition-all duration-300 ease-in-out'} {isMobile ? 'fixed z-50 top-0 bottom-0 max-h-screen overflow-hidden' : 'relative'}"
-  style="{isMobile ? `width: 280px; transform: translateX(${sidebarVisible ? '0' : '-100%'})` : `width: ${width}; min-width: ${width}; max-width: ${width};`}"
+  style="{isMobile ? `width: 280px; transform: translateX(${sidebarVisible ? '0' : '-100%'}); left: 0;` : `width: ${width}; min-width: ${width}; max-width: ${width};`}"
+  class:pointer-events-none={isMobile && !sidebarVisible}
 >
   
   {#if !collapsed && !isMobile}

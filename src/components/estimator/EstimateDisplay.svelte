@@ -5,6 +5,7 @@
   import { supabase } from '$lib/supabase';
   import { user } from '../../stores/authStore';
   import { gridData, currentProjectId } from '../../stores/gridStore';
+  import { selectedRange as selectedRangeStore } from '../../stores/rangeSelectionStore';
   import { toast } from "svelte-sonner";
   import { exportToExcel } from '$lib/utils';
 
@@ -18,6 +19,8 @@
   let editingColumn = null;
   let gridContainer = null;
   let revoGridInstance = null;
+  let currentSelection = null;
+  let rangeReference = null;
   let newColumn = {
     column_name: '',
     data_type: 'text',
@@ -32,12 +35,8 @@
     amount: 0,
     costType: 'material'
   };
-  
-  
   const dispatch = createEventDispatcher();
-  
   const COLUMN_WIDTHS_KEY = 'neuro-estimator-column-widths';
-  
   setContext('getGridData', () => {
     return { gridSource, gridColumns };
   });
@@ -97,7 +96,6 @@
       loadProjectData(projectId);
     }
     
-    // Improve mobile touch handling
     if (typeof window !== 'undefined') {
       const isMobile = window.matchMedia('(max-width: 640px)').matches;
       
@@ -127,6 +125,7 @@
         }, 500);
       }
     }
+    
   });
   
   $: if (result && result.estimate && result.estimate.lineItems) {
@@ -183,27 +182,23 @@
         return acc;
       }, {});
 
-      // Create line items by combining columns for each row
       const lineItems: LineItem[] = Object.entries(itemsByRow).map(([rowNumber, rowItems]) => {
         const rowData: LineItem = {
           id: null,
           row_number: parseInt(rowNumber),
           subItems: [],
-          amount: 0 // Initialize amount to avoid TypeScript errors
+          amount: 0
         };
 
-        // Map each column value to the corresponding property
         rowItems.forEach((item: EstimateItem) => {
           const column = projectColumns.find((col: ColumnDefinition) => col.id === item.column_id);
           if (column) {
-            // Handle special cases for certain column types
             if (['quantity', 'unit_price', 'amount'].includes(column.column_name)) {
               rowData[column.column_name] = parseFloat(item.value) || 0;
             } else {
               rowData[column.column_name] = item.value;
             }
             
-            // Set the ID from the first item (assuming all items in a row have the same ID)
             if (!rowData.id) {
               rowData.id = item.id;
             }
@@ -218,7 +213,7 @@
           title: projectData.name,
           description: projectData.description,
           currency: 'USD',
-          projectColumns: projectColumns, // Include project columns in the result
+          projectColumns: projectColumns,
           lineItems: lineItems,
           totalAmount: lineItems.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0)
         }
@@ -245,24 +240,19 @@
     
     if (!data.estimate || !data.estimate.lineItems) return;
 
-    // Get project columns from the data or use an empty array as fallback
     const projectColumns = (data.estimate.projectColumns || []).filter(
       column => !['parent_item_id', 'data', 'currency'].includes(column.column_name)
     );
     
-    // Generate column definitions based on projectColumns
     const dynamicColumns: ColumnRegular[] = projectColumns.map(column => {
-      // Convert snake_case to Title Case for display
       const displayName = column.column_name
         .split('_')
         .map(word => word.charAt(0).toUpperCase() + word.slice(1))
         .join(' ');
       
-      // Create a closure to capture the current column
       const currentColumnName = column.column_name;
       const currentColumn = column;
       
-      // Define base column properties with custom header template
       const baseColumn: ColumnRegular = {
         prop: column.column_name,
         name: displayName,
@@ -370,7 +360,6 @@
         }
       };
 
-      // Handle different data types
       switch (column.data_type) {
         case 'number':
         case 'integer':
@@ -412,7 +401,6 @@
       }
     });
 
-    // Add actions column
     const actionsColumn: ColumnRegular = {
       prop: 'actions',
       name: 'Actions',
@@ -443,24 +431,18 @@
         );
       }
     };
-
     // Combine dynamic columns with the actions column
     const defaultColumns = [...dynamicColumns, actionsColumn];
     gridColumns = applySavedColumnWidths(defaultColumns);
     const flattenedItems = [];
-    
-    // Create a map of column names for quick lookup
     const columnNames = (data.estimate.projectColumns || []).map(col => col.column_name);
-    
     data.estimate.lineItems.forEach((item, index) => {
-      // Create a base item with all dynamic properties
       const rowItem = { 
         id: item.id,
         isHeader: true,
-        ...item // Spread all item properties to make them available to columns
+        ...item 
       };
       
-      // Ensure all column properties exist on the item to prevent undefined errors
       columnNames.forEach(colName => {
         if (rowItem[colName] === undefined) {
           rowItem[colName] = null;
@@ -469,7 +451,6 @@
       
       flattenedItems.push(rowItem);
       
-      // Handle sub-items if they exist
       if (item.subItems && item.subItems.length > 0) {
         item.subItems.forEach((subItem, subIndex) => {
           const subRowItem = {
@@ -478,7 +459,6 @@
             isSubItem: true
           };
           
-          // Add indentation to description if it exists
           if (subItem.description !== undefined) {
             subRowItem.description = `    ${subItem.description}`;
           }
@@ -488,7 +468,6 @@
       }
     });
     
-    // Add total row
     const totalRow = {
       id: 'total',
       description: 'Total',
@@ -496,7 +475,6 @@
       isTotal: true
     };
     
-    // Add empty values for all columns in the total row
     columnNames.forEach(colName => {
       if (colName !== 'description' && colName !== 'amount') {
         totalRow[colName] = '';
@@ -510,15 +488,11 @@
   function saveColumnWidths(columnDetails: {[index: number]: {prop: string, size: number}}) {
     try {
       const widthsToSave: {[prop: string]: number} = {};
-      
       Object.entries(columnDetails).forEach(([index, column]) => {
         widthsToSave[column.prop] = column.size;
       });
-      
       const existingWidths = JSON.parse(localStorage.getItem(COLUMN_WIDTHS_KEY) || '{}');
-      
       const updatedWidths = { ...existingWidths, ...widthsToSave };
-      
       localStorage.setItem(COLUMN_WIDTHS_KEY, JSON.stringify(updatedWidths));
     } catch (error) {
       console.error('Error saving column widths to local storage:', error);
@@ -536,7 +510,6 @@
   
   function applySavedColumnWidths(defaultColumns: ColumnRegular[]) {
     const savedWidths = loadColumnWidths();
-    
     return defaultColumns.map(column => {
       if (savedWidths[column.prop]) {
         return { ...column, size: savedWidths[column.prop] };
@@ -567,17 +540,14 @@
       
       const projectColumns = result?.estimate?.projectColumns || [];
       
-      // Find the next row number
       const existingItems = result?.estimate?.lineItems || [];
       const maxRowNumber = existingItems.reduce((max, item) => {
         return Math.max(max, item.row_number || 0);
       }, 0);
       const newRowNumber = maxRowNumber + 1;
       
-      // Prepare inserts for each column
       const insertPromises = [];
       
-      // Map form fields to column names and values
       const fieldMappings = {
         'description': newItem.description,
         'title': newItem.description, // Support both column names
@@ -929,6 +899,56 @@
     }
   }
   
+  async function handleMouseUp() {
+    console.log('handleMouseUp triggered - device type:', navigator.userAgent.includes('Mobile') ? 'mobile' : 'desktop');
+    setTimeout(async () => {
+      if (revoGridInstance) {
+        try {
+          const selection = await revoGridInstance.getSelectedRange();
+          console.log('Raw selection from RevoGrid:', selection);
+          console.log('Selection type:', typeof selection);
+          console.log('Selection keys:', selection ? Object.keys(selection) : 'null');
+          
+          if (selection && typeof selection.y === 'number' && typeof selection.y1 === 'number') {
+            const startRow = selection.y + 1;
+            const endRow = selection.y1 + 1;
+            
+            const rangeRef = startRow === endRow ? `@${startRow}` : `@${startRow}-${endRow}`;
+            
+            currentSelection = selection;
+            rangeReference = rangeRef;
+            
+            console.log('Updated rangeReference state:', rangeReference);
+          } else {
+            console.log('Selection is invalid or null, clearing state');
+            currentSelection = null;
+            rangeReference = null;
+          }
+        } catch (error) {
+          console.error('Error getting selected range:', error);
+          currentSelection = null;
+          rangeReference = null;
+        }
+      } else {
+        console.log('revoGridInstance is null');
+      }
+    }, 100);
+  }
+  
+  function sendRangeToAI() {
+    if (rangeReference) {
+      selectedRangeStore.set(rangeReference);
+      window.dispatchEvent(new CustomEvent('toggleAiSidebar', {
+        detail: { 
+          projectId: projectId,
+          projectName: result?.estimate?.title || 'Project'
+        }
+      }));
+      currentSelection = null;
+      rangeReference = null;
+    }
+  }
+  
 </script>
 
 <style>
@@ -1046,6 +1066,17 @@
           </div>
         </div>
         <div class="flex items-center gap-2 shrink-0">
+          {#if rangeReference}
+            <button 
+              on:click={sendRangeToAI}
+              class="bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white px-3 py-2 rounded-md text-sm font-medium flex items-center justify-center shadow-sm transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              <span class="whitespace-nowrap">Send {rangeReference} to AI</span>
+            </button>
+          {/if}
           <button 
             on:click={() => exportToExcel(
         gridSource,
@@ -1098,6 +1129,17 @@
             </div>
           </div>
           <div class="flex gap-1">
+            {#if rangeReference}
+              <button 
+                on:click={sendRangeToAI}
+                class="bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white p-1.5 rounded-md flex items-center justify-center shadow-sm"
+                aria-label="Send {rangeReference} to AI"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+              </button>
+            {/if}
             <button 
               on:click={() => exportToExcel(
         gridSource,
@@ -1226,7 +1268,7 @@
       {/if}
     </div>
   </div>
-  <div class="grid-container flex-1 bg-white rounded-md overflow-hidden mobile-grid-container relative" bind:this={gridContainer}>
+  <div class="grid-container flex-1 bg-white rounded-md overflow-hidden mobile-grid-container relative" bind:this={gridContainer} on:mouseup={handleMouseUp} role="grid" tabindex="0">
     <RevoGrid
       bind:this={revoGridInstance}
       source={gridSource} 

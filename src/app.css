@@ -34,7 +34,7 @@
     --ring: 222.2 84% 4.9%;
 
     --radius: 0.5rem;
-    
+
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 240 5.9% 10%;
@@ -74,7 +74,7 @@
     --destructive-foreground: 210 40% 98%;
 
     --ring: 212.7 26.8% 83.9%;
-    
+
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
@@ -110,7 +110,7 @@
     height: calc(100vh - 150px); /* Slightly more space on mobile */
     overflow: visible; /* Allow the grid to handle its own scrolling */
   }
-  
+
   /* Prevent scrolling on main containers */
   body, html {
     overflow: hidden;
@@ -118,22 +118,17 @@
     position: fixed;
     width: 100%;
   }
-  
+
   /* Allow only the grid viewport to scroll */
   .grid-container .rgViewport {
     overflow-y: auto !important;
   }
-  
+
   /* Specific styles for our mobile grid container */
   .mobile-grid-container {
     position: relative;
     z-index: 10; /* Ensure grid is above other elements */
     max-height: calc(100vh - 150px);
-  }
-  
-  /* Ensure the grid takes available space */
-  .mobile-grid-container revo-grid {
-    max-height: 100%;
   }
 }
 
