@@ -92,15 +92,15 @@
 <Dialog.Root bind:open on:openChange={handleOpenChange}>
   <Dialog.Portal>
     <Dialog.Overlay class="fixed inset-0 bg-black/50 z-50" />
-    <Dialog.Content class="fixed left-[50%] top-[50%] z-50 max-h-[85vh] w-[90vw] max-w-[750px] translate-x-[-50%] translate-y-[-50%] rounded-lg bg-white p-6 shadow-xl border border-gray-100">
+    <Dialog.Content class="fixed left-[50%] top-[50%] z-50 max-h-[90vh] w-[95vw] max-w-[750px] translate-x-[-50%] translate-y-[-50%] rounded-lg bg-white p-4 sm:p-6 shadow-xl border border-gray-100">
       <Dialog.Header>
-        <Dialog.Title class="text-2xl font-bold text-center text-primary">Welcome to Estimating Agent</Dialog.Title>
-        <Dialog.Description class="text-center text-gray-600 mt-2 text-base">
+        <Dialog.Title class="text-xl sm:text-2xl font-bold text-center text-primary">Welcome to Estimating Agent</Dialog.Title>
+        <Dialog.Description class="text-center text-gray-600 mt-1 sm:mt-2 text-sm sm:text-base">
           AI-Powered Construction Estimation
         </Dialog.Description>
       </Dialog.Header>
 
-      <div class="mt-5 overflow-y-auto max-h-[calc(85vh-120px)]" bind:this={contentRef}>
+      <div class="mt-3 sm:mt-5 overflow-y-auto max-h-[calc(90vh-160px)]" bind:this={contentRef}>
         <div class="bg-amber-50 border border-amber-200 rounded-md p-3 mb-4 shadow-sm">
           <h3 class="font-semibold text-amber-800 text-sm">Alpha Release</h3>
           <p class="text-amber-700 text-sm mt-1">
@@ -199,8 +199,8 @@
         </div>
       </div>
 
-      <Dialog.Footer class="mt-5 flex justify-end">
-        <Dialog.Close class="px-5 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-all hover:shadow-md text-base font-medium">
+      <Dialog.Footer class="mt-3 sm:mt-5 flex justify-end">
+        <Dialog.Close class="px-4 sm:px-5 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-all hover:shadow-md text-sm sm:text-base font-medium">
           Got it
         </Dialog.Close>
       </Dialog.Footer>

@@ -86,6 +86,7 @@
       <button 
         class="p-1.5 rounded-md hover:bg-slate-100 active:bg-slate-200 dark:hover:bg-slate-800" 
         on:click={close}
+        data-testid="ai-sidebar-close-button"
         aria-label="Close AI sidebar"
       >
         <X class="h-5 w-5" />
@@ -133,25 +134,24 @@
 
 <!-- Mobile: Overlay layout -->
 <div 
-  class="md:hidden h-full flex flex-col border-l bg-background transition-all duration-300 ease-in-out fixed z-40 right-0 top-0 bottom-0 w-[90vw] sm:w-[350px] max-w-[350px]" 
+  class="md:hidden h-full flex flex-col border-l bg-background transition-all duration-300 ease-in-out fixed z-[60] right-0 top-0 bottom-0 w-full" 
   class:translate-x-full={!open}
   class:translate-x-0={open}
+  data-testid="ai-sidebar-mobile"
 >
-  <div class="p-3 sm:p-4 border-b flex items-center justify-between">
-    <div class="flex items-center gap-2">
-      <MessageSquare class="h-5 w-5" />
-      <h2 class="text-lg font-semibold truncate">AI Estimating Agent</h2>
+  <div class="p-3 sm:p-4 border-b flex items-center justify-between gap-2">
+    <div class="flex items-center gap-2 min-w-0">
+      <MessageSquare class="h-5 w-5 flex-shrink-0" />
+      <h2 class="text-base sm:text-lg font-semibold truncate">AI Agent</h2>
     </div>
-    <div class="flex items-center gap-2">
-      <div class="text-sm text-muted-foreground max-w-[100px] sm:max-w-[150px] truncate">{projectName || 'New Project'}</div>
-      <button 
-        class="p-1.5 rounded-md hover:bg-slate-100 active:bg-slate-200 dark:hover:bg-slate-800" 
-        on:click={close}
-        aria-label="Close AI sidebar"
-      >
-        <X class="h-5 w-5" />
-      </button>
-    </div>
+    <button 
+      class="p-1.5 rounded-md hover:bg-slate-100 active:bg-slate-200 dark:hover:bg-slate-800 flex-shrink-0 ml-auto" 
+      on:click={close}
+      aria-label="Close AI sidebar"
+      data-testid="ai-sidebar-close-button"
+    >
+      <X class="h-5 w-5" />
+    </button>
   </div>
   
   <div class="flex-1 overflow-hidden">
@@ -193,12 +193,13 @@
 
 {#if open}
   <div 
-    class="fixed inset-0 bg-black/40 backdrop-blur-sm z-30 md:hidden" 
+    class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[55] md:hidden" 
     on:click={close}
     on:keydown={(e) => e.key === 'Escape' && close()}
     role="button"
     tabindex="0"
     aria-label="Close AI sidebar"
+    data-testid="ai-sidebar-backdrop"
   ></div>
 {/if}
 

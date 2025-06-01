@@ -56,7 +56,7 @@
 </script>
 
 <Dialog {open} onOpenChange={onOpenChange}>
-  <DialogContent class="sm:max-w-[425px]">
+  <DialogContent class="w-[95vw] max-w-[425px] sm:w-auto">
     <DialogHeader>
       <DialogTitle>{isLogin ? "Login" : "Sign Up"}</DialogTitle>
       <DialogDescription>
@@ -104,7 +104,7 @@
             {isLogin ? "Need an account? Sign up" : "Already have an account? Login"}
           </span>
         </button>
-        <Button type="submit" disabled={loading} class="mt-2 sm:mt-0">
+        <Button type="submit" data-testid="login-button" disabled={loading} class="mt-2 sm:mt-0">
           {loading ? "Processing..." : isLogin ? "Login" : "Sign Up"}
         </Button>
       </DialogFooter>

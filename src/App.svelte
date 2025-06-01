@@ -86,6 +86,8 @@
     if (showAiSidebar) {
       aiSidebarProjectId = projectId;
       aiSidebarProjectName = projectName;
+      // Dispatch event to notify that sidebar is opened
+      window.dispatchEvent(new CustomEvent('aiSidebarOpened'));
     }
   }
   

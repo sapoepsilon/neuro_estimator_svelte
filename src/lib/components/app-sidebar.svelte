@@ -423,6 +423,7 @@
           <button 
             class="w-full py-2 px-4 border border-gray-300 rounded-md flex items-center justify-center text-sm hover:bg-gray-100" 
             on:click={() => { openLoginDialog(); sidebarVisible = false; }}
+            data-testid="sidebar-login-button"
           >
             <LogIn class="h-4 w-4 mr-2" />
             Login / Sign Up

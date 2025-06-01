@@ -179,10 +179,16 @@
       isAiSidebarVisible = false;
     };
     
+    const handleSidebarOpen = () => {
+      isAiSidebarVisible = true;
+    };
+    
     window.addEventListener('aiSidebarClosed', handleSidebarClose);
+    window.addEventListener('aiSidebarOpened', handleSidebarOpen);
     
     return () => {
       window.removeEventListener('aiSidebarClosed', handleSidebarClose);
+      window.removeEventListener('aiSidebarOpened', handleSidebarOpen);
     };
   });
   
@@ -274,10 +280,11 @@
         on:itemDeleted={handleItemDeleted}
       />
       
-      <!-- AI Sidebar Toggle Button - Always rendered but conditionally visible -->
+      <!-- AI Sidebar Toggle Button - Conditionally rendered -->
+      {#if !isAiSidebarVisible}
       <div 
-        class="fixed bottom-6 right-6 flex flex-col items-end space-y-2 z-[999] transition-opacity duration-300" 
-        style="pointer-events: auto; {isAiSidebarVisible ? 'opacity: 0; visibility: hidden;' : 'opacity: 1; visibility: visible;'}"
+        class="fixed bottom-6 right-6 flex flex-col items-end space-y-2 z-[999]" 
+        style="pointer-events: auto;"
       >
         <div class="hidden md:block bg-white dark:bg-gray-800 text-xs text-gray-500 dark:text-gray-400 p-2 rounded-md shadow-md flex items-center mb-2">
           <Keyboard class="h-3 w-3 mr-1" />
@@ -287,11 +294,13 @@
           class="bg-primary text-white p-3 rounded-full shadow-lg hover:bg-primary/90 transition-colors z-[100] cursor-pointer"
           on:click={toggleAiSidebar}
           aria-label="Toggle AI Estimator"
+          data-testid="ai-sidebar-toggle-button"
           style="pointer-events: auto;"
         >
           <MessageSquare class="h-6 w-6" />
         </button>
       </div>
+      {/if}
     </div>
   {:else}
     <div class="relative">
@@ -308,6 +317,7 @@
             class="bg-primary text-white p-3 rounded-full shadow-lg hover:bg-primary/90 transition-colors z-[100] cursor-pointer"
             on:click={toggleAiSidebar}
             aria-label="Toggle AI Estimator"
+            data-testid="ai-sidebar-toggle-button"
             style="pointer-events: auto;"
           >
             <MessageSquare class="h-6 w-6" />

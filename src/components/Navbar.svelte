@@ -28,6 +28,7 @@
             on:click={() => openLoginDialog()} 
             class="hidden md:inline-flex px-4 py-2 text-sm font-medium rounded-md hover:bg-accent hover:text-accent-foreground transition-colors"
             type="button"
+            data-testid="nav-login-button"
           >
             Login / Sign Up
           </button>
