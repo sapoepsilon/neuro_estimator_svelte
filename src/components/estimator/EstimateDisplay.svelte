@@ -900,27 +900,17 @@
   }
   
   async function handleMouseUp() {
-    console.log('handleMouseUp triggered - device type:', navigator.userAgent.includes('Mobile') ? 'mobile' : 'desktop');
     setTimeout(async () => {
       if (revoGridInstance) {
         try {
           const selection = await revoGridInstance.getSelectedRange();
-          console.log('Raw selection from RevoGrid:', selection);
-          console.log('Selection type:', typeof selection);
-          console.log('Selection keys:', selection ? Object.keys(selection) : 'null');
-          
           if (selection && typeof selection.y === 'number' && typeof selection.y1 === 'number') {
             const startRow = selection.y + 1;
             const endRow = selection.y1 + 1;
-            
             const rangeRef = startRow === endRow ? `@${startRow}` : `@${startRow}-${endRow}`;
-            
             currentSelection = selection;
             rangeReference = rangeRef;
-            
-            console.log('Updated rangeReference state:', rangeReference);
           } else {
-            console.log('Selection is invalid or null, clearing state');
             currentSelection = null;
             rangeReference = null;
           }
@@ -938,7 +928,7 @@
   function sendRangeToAI() {
     if (rangeReference) {
       selectedRangeStore.set(rangeReference);
-      window.dispatchEvent(new CustomEvent('toggleAiSidebar', {
+      window.dispatchEvent(new CustomEvent('openAiSidebar', {
         detail: { 
           projectId: projectId,
           projectName: result?.estimate?.title || 'Project'

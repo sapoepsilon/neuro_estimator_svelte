@@ -73,83 +73,30 @@
   
 </script>
 
-<!-- Desktop: Side-by-side layout (not fixed) -->
+<!-- Single responsive layout -->
 {#if open}
 <div 
-  class="h-full flex-col border-l bg-background transition-all duration-300 ease-in-out w-[350px] flex-shrink-0 hidden md:flex"
->
-  <div class="p-3 sm:p-4 border-b flex items-center justify-between">
-    <div class="flex items-center gap-2">
-      <MessageSquare class="h-5 w-5" />
-      <h2 class="text-lg font-semibold truncate">AI Estimating Agent</h2>
-    </div>
-    <div class="flex items-center gap-2">
-      <button 
-        class="p-1.5 rounded-md hover:bg-slate-100 active:bg-slate-200 dark:hover:bg-slate-800" 
-        on:click={close}
-        data-testid="ai-sidebar-close-button"
-        aria-label="Close AI sidebar"
-      >
-        <X class="h-5 w-5" />
-      </button>
-    </div>
-  </div>
-  
-  <div class="flex-1 overflow-hidden">
-    {#if isLoading}
-      <div class="flex items-center justify-center h-full">
-        <p class="text-sm text-muted-foreground">Loading conversation...</p>
-      </div>
-    {:else if error}
-      <div class="flex items-center justify-center h-full p-4">
-        <div class="p-3 rounded-lg bg-destructive text-destructive-foreground max-w-[80%]">
-          <p class="text-sm">Error: {error}</p>
-          <button 
-            class="mt-2 text-xs underline"
-            on:click={fetchLatestConversation}
-          >
-            Try again
-          </button>
-        </div>
-      </div>
-    {:else}
-      <AgentChat 
-        projectId={projectId}
-        projectName={projectName}
-        conversationId={latestConversation?.id}
-        on:aiResponseSuccess={(event) => {
-          // Dispatch a global event to notify that the AI agent has responded successfully
-          window.dispatchEvent(new CustomEvent('aiEstimateUpdated', {
-            detail: {
-              projectId: event.detail.projectId,
-              estimateId: event.detail.estimateId,
-              responseData: event.detail.responseData
-            }
-          }));
-        }}
-      />
-    {/if}
-  </div>
-</div>
-{/if}
-
-<!-- Mobile: Overlay layout -->
-<div 
-  class="md:hidden h-full flex flex-col border-l bg-background transition-all duration-300 ease-in-out fixed z-[60] right-0 top-0 bottom-0 w-full" 
-  class:translate-x-full={!open}
-  class:translate-x-0={open}
-  data-testid="ai-sidebar-mobile"
+  class="h-full flex-col border-l bg-background transition-all duration-300 ease-in-out
+         md:w-[350px] md:flex-shrink-0 md:relative
+         w-full fixed z-[60] right-0 top-0 bottom-0 md:z-auto
+         flex
+         md:translate-x-0
+         {open ? 'translate-x-0' : 'translate-x-full md:translate-x-0'}"
+  data-testid="ai-sidebar"
 >
   <div class="p-3 sm:p-4 border-b flex items-center justify-between gap-2">
     <div class="flex items-center gap-2 min-w-0">
       <MessageSquare class="h-5 w-5 flex-shrink-0" />
-      <h2 class="text-base sm:text-lg font-semibold truncate">AI Agent</h2>
+      <h2 class="text-base md:text-lg font-semibold truncate">
+        <span class="hidden md:inline">AI Estimating Agent</span>
+        <span class="md:hidden">AI Agent</span>
+      </h2>
     </div>
     <button 
-      class="p-1.5 rounded-md hover:bg-slate-100 active:bg-slate-200 dark:hover:bg-slate-800 flex-shrink-0 ml-auto" 
+      class="p-1.5 rounded-md hover:bg-slate-100 active:bg-slate-200 dark:hover:bg-slate-800 flex-shrink-0" 
       on:click={close}
-      aria-label="Close AI sidebar"
       data-testid="ai-sidebar-close-button"
+      aria-label="Close AI sidebar"
     >
       <X class="h-5 w-5" />
     </button>
@@ -191,6 +138,7 @@
     {/if}
   </div>
 </div>
+{/if}
 
 {#if open}
   <div 

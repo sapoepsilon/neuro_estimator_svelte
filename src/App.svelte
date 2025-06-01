@@ -91,6 +91,22 @@
     }
   }
   
+  // Function to handle AI sidebar open (always opens, doesn't toggle)
+  function handleOpenAiSidebar(event) {
+    const { projectId, projectName } = event.detail;
+    
+    // Only update if the sidebar is not already open
+    if (!showAiSidebar) {
+      showAiSidebar = true;
+      // Dispatch event to notify that sidebar is opened
+      window.dispatchEvent(new CustomEvent('aiSidebarOpened'));
+    }
+    
+    // Always update project details (in case they changed)
+    aiSidebarProjectId = projectId;
+    aiSidebarProjectName = projectName;
+  }
+  
   // Function to explicitly hide the AI sidebar
   function handleHideAiSidebar() {
     showAiSidebar = false;
@@ -114,12 +130,16 @@
     // Listen for AI sidebar toggle events
     window.addEventListener('toggleAiSidebar', handleToggleAiSidebar);
     
+    // Listen for AI sidebar open events
+    window.addEventListener('openAiSidebar', handleOpenAiSidebar);
+    
     // Listen for hide AI sidebar events
     window.addEventListener('hideAiSidebar', handleHideAiSidebar);
     
     return () => {
       window.removeEventListener('projectSelected', handleProjectSelected);
       window.removeEventListener('toggleAiSidebar', handleToggleAiSidebar);
+      window.removeEventListener('openAiSidebar', handleOpenAiSidebar);
       window.removeEventListener('hideAiSidebar', handleHideAiSidebar);
     };
   });

@@ -30,45 +30,34 @@
   
   type Message = MessageBase | LoadingMessage | ErrorMessage;
   
-
-  
-  // Chat state
   let messages: Message[] = [];
   let internalConversationId: string | null = conversationId;
   let isLoading = true;
-  let isApiLoading = false; // Track API request loading state
+  let isApiLoading = false; 
   let loadError: string | null = null;
-  
   let chatContainer: HTMLElement;
-  
-  // XML response handling
   let expandedMessages: Set<string> = new Set();
-  
-  // Range selection state
   let rangeInput = '';
   let showRangeSuggestions = false;
   let rangeStart = 0;
   let rangeEnd = 0;
   let gridItems: Array<{id: string, name: string, row: number}> = [];
   let selectedRange: { start: number, end: number } | null = null;
-  let rangeSelectionComplete = false; // Flag to track if a range selection was completed
+  let rangeSelectionComplete = false; 
   
-  // Subscribe to grid data changes
   $: if ($gridData && $gridData.gridSource) {
     console.log('Grid data updated:', $gridData.gridSource.length, 'items');
     gridItems = $gridData.gridSource
-      .filter((item: any) => item?.description) // Only include items with a description
+      .filter((item: any) => item?.description)
       .map((item: any, index: number) => ({
         id: item.id || `row-${index}`,
         name: item.description || `Item ${index + 1}`,
-        row: index + 1 // 1-based index for display
+        row: index + 1
       }));
     console.log('Processed grid items:', gridItems.length);
   }
   
-  // Handle @ key press for range selection
   function handleAtKey() {
-    // Reset the range selection complete flag when @ is pressed
     rangeSelectionComplete = false;
     
     const cursorPos = (document.activeElement as HTMLInputElement).selectionStart || 0;
@@ -80,41 +69,30 @@
       showRangeSuggestions = true;
       console.log('@ key pressed, showing suggestions. Grid items:', gridItems.length);
       
-      // Force the input to include the @ symbol if it was just typed
       if (lastAt === cursorPos - 1) {
-        // Already added by normal typing
         rangeInput = '';
       } else {
-        // Extract any text after @ to use as filter
         rangeInput = textBeforeCursor.substring(lastAt + 1, cursorPos);
       }
     }
   }
   
-  // Handle range selection
   function selectRange(start: number, end: number) {
-    // Create the range text
     const rangeText = `@${start}-${end}`;
-    
-    // Find the position of the @ symbol we're replacing
     const cursorPos = (document.activeElement as HTMLInputElement)?.selectionStart || 0;
     const textBeforeCursor = $messageInput.substring(0, cursorPos);
     const lastAt = textBeforeCursor.lastIndexOf('@');
     
     if (lastAt !== -1) {
-      // Replace the entire @... text with our formatted range
       const beforeAt = $messageInput.substring(0, lastAt);
       const afterRange = $messageInput.substring(lastAt).replace(/^@[^\s]*/, '');
       $messageInput = `${beforeAt}${rangeText}${afterRange}`;
     } else {
-      // No @ found, just append to the end
       $messageInput += rangeText;
     }
     
-    // Hide suggestions
     showRangeSuggestions = false;
     
-    // Focus back on the input
     setTimeout(() => {
       const input = document.querySelector('input[type="text"]') as HTMLInputElement;
       if (input) {
@@ -123,23 +101,17 @@
     }, 0);
   }
 
-  // Parse range from @ notation (e.g., @5-10)
   function parseRange(text: string): { start: number, end: number } | null {
     const rangeMatch = text.match(/(\d+)(?:-(\d+))?/);
-    
     if (!rangeMatch) return null;
-    
     const start = parseInt(rangeMatch[1], 10);
     const end = rangeMatch[2] ? parseInt(rangeMatch[2], 10) : start;
-    
     if (isNaN(start) || isNaN(end) || start <= 0 || end <= 0 || start > end) {
       return null;
     }
-    
     return { start, end };
   }
   
-  // Apply the selected range
   function applyRange() {
     const range = parseRange(rangeInput);
     if (range) {
@@ -147,19 +119,14 @@
     }
   }
 
-  // Clear the selected range
   function clearRange() {
     selectedRange = null;
   }
-
-  // Handle @ key press to show range selector
   function handleInputKeydown(event: KeyboardEvent) {
     if (event.key === '@') {
       showRangeSuggestions = true;
       event.preventDefault();
-      // Add @ to the input
       $messageInput = $messageInput + '@';
-      // Focus the range input
       setTimeout(() => {
         const rangeInputEl = document.getElementById('range-input');
         if (rangeInputEl) rangeInputEl.focus();
@@ -169,7 +136,6 @@
 
   const dispatch = createEventDispatcher();
 
-  // Function to load conversation history for the current project
   async function loadConversationHistory() {
     if ((!projectId && !internalConversationId) || !$user) {
       isLoading = false;
@@ -180,7 +146,6 @@
       isLoading = true;
       loadError = null;
       
-      // Use the provided conversationId if available, otherwise find the latest one
       if (!internalConversationId && projectId) {
         const { data: conversationData, error: conversationError } = await supabase
           .from('conversations')
@@ -194,14 +159,11 @@
         }
         
         if (conversationData && conversationData.length > 0) {
-          // Existing conversation found
           internalConversationId = conversationData[0].id;
         }
       }
         
-      // Load messages if we have a conversation ID
       if (internalConversationId) {
-        // Load messages for this conversation
         const { data: messagesData, error: messagesError } = await supabase
           .from('messages')
           .select('*')
@@ -235,9 +197,6 @@
             };
           });
         } else {
-          // No messages found for this conversation, but we have a conversation ID
-          // Add a welcome message to get started
-          console.log('No messages found for conversation ID:', internalConversationId);
           messages = [
             {
               role: 'assistant' as const,
@@ -269,8 +228,6 @@
       ];
     } finally {
       isLoading = false;
-      
-      // Scroll to bottom after loading messages
       setTimeout(() => {
         if (chatContainer) {
           chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -279,14 +236,9 @@
     }
   }
   
-  // Function to send message to AI agent
   async function sendMessage() {
     if (!$messageInput.trim() || !$user) return;
-    
-    // Hide range suggestions if visible
     showRangeSuggestions = false;
-    
-    // Check for range references in the message
     const rangeReferences: Array<{range: {start: number, end: number}, text: string}> = [];
     const messageWithRanges = $messageInput.replace(/@(\d+)(?:-(\d+))?/g, (match, start, end) => {
       const range = {
@@ -297,8 +249,6 @@
       rangeReferences.push({ range, text: `[Rows ${range.start}-${range.end}]` });
       return `[${rangeId}]`;
     });
-    
-    // Add user message to chat with formatted ranges
     let displayMessage = $messageInput;
     rangeReferences.forEach(ref => {
       displayMessage = displayMessage.replace(
@@ -314,18 +264,15 @@
     
     messages = [...messages, userMessage];
     
-    // Clear input
     const messageContent = $messageInput;
     $messageInput = '';
     
-    // Scroll to bottom
     setTimeout(() => {
       if (chatContainer) {
         chatContainer.scrollTop = chatContainer.scrollHeight;
       }
     }, 100);
     
-    // Add loading message
     messages = [...messages, {
       role: 'assistant',
       content: '...',
@@ -333,7 +280,6 @@
     } as LoadingMessage];
     
     try {
-      // Create a conversation if we don't have one yet
       if (!internalConversationId && projectId) {
         const { data: newConversation, error: conversationError } = await supabase
           .from('conversations')
@@ -390,7 +336,7 @@
         accessToken = data.session?.access_token || '';
       }
       
-      isApiLoading = true; // Set API loading state to true
+      isApiLoading = true;
       try {
         response = await fetch(API_AGENT_PROMPT_URL, {
           method: 'POST',
@@ -411,14 +357,14 @@
         
         if (!response.ok) {
           const errorText = await response.text();
-          isApiLoading = false; // Reset API loading state on error response
+          isApiLoading = false;
           throw new Error(`API responded with status: ${response.status}. Details: ${errorText}`);
         }
         
         data = await response.json();
       } catch (apiError) {
         console.error('API call error details:', apiError);
-        isApiLoading = false; // Reset API loading state on API error
+        isApiLoading = false;
         messages = [...messages, {
           role: 'system',
           content: `Error connecting to AI agent: ${apiError.message || 'Unknown error'}`,
@@ -427,15 +373,13 @@
         return;
       }
       
-      isApiLoading = false; // Reset API loading state
+      isApiLoading = false;
       
-      // Create the assistant response object
       const assistantResponse: MessageBase = {
         role: 'assistant' as const,
         content: data.response || 'Completed'
       };
       
-      // Save the message to the database to get an ID
       if (internalConversationId) {
         try {
           const { data: savedMessage, error: saveError } = await supabase
@@ -451,10 +395,8 @@
           
           if (saveError) {
             console.error('Error saving assistant message:', saveError);
-            // Still add the message to the UI even if saving fails
             messages = [...messages, assistantResponse];
           } else if (savedMessage) {
-            // Add the saved message with ID to the messages array
             messages = [...messages, savedMessage as MessageBase];
           }
         } catch (error) {
@@ -462,12 +404,9 @@
           messages = [...messages, assistantResponse];
         }
       } else {
-        // No conversation ID, just add to UI
         messages = [...messages, assistantResponse];
       }
       
-      // Dispatch an event to notify that the AI agent has responded successfully
-      // This will allow other components to refresh their data
       dispatch('aiResponseSuccess', {
         projectId: projectId,
         estimateId: estimateId,
@@ -482,8 +421,7 @@
       
     } catch (error) {
       console.error('Error sending message to AI agent:', error);
-      
-      isApiLoading = false; // Reset API loading state on error
+      isApiLoading = false;
       messages = messages.filter(m => !('loading' in m));
       messages = [...messages, {
         role: 'system',
@@ -493,27 +431,21 @@
     }
   }
   
-  // Check if a message contains an XML estimate
   function containsXmlEstimate(content: string): boolean {
     return content.includes('<estimate>') && content.includes('</estimate>');
   }
   
   function handleKeydown(event: KeyboardEvent) {
-    // Handle @ key for range selection
     if (event.key === '@') {
       handleAtKey();
       return;
     }
     
-    // Handle Enter key
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       
       if (showRangeSuggestions) {
-        // If we have a range selection dropdown open
         showRangeSuggestions = false;
-        
-        // Get the text after @ to check for range format
         const cursorPos = (event.target as HTMLInputElement)?.selectionStart || 0;
         const textBeforeCursor = $messageInput.substring(0, cursorPos);
         const lastAt = textBeforeCursor.lastIndexOf('@');
@@ -527,24 +459,20 @@
             const end = match[2] ? parseInt(match[2], 10) : start;
             
             if (!isNaN(start) && !isNaN(end)) {
-              // Replace the current @text with the properly formatted range
               const beforeAt = $messageInput.substring(0, lastAt);
               const afterRange = $messageInput.substring(lastAt + textAfterAt.length + 1);
               const rangeText = `@${start}-${end}`;
               $messageInput = `${beforeAt}${rangeText}${afterRange}`;
               
-              // Mark range selection as complete
               rangeSelectionComplete = true;
               return;
             }
           }
         }
       } else {
-        // No range selection active, send the message
         sendMessage();
       }
     } 
-    // Handle Escape key
     else if (event.key === 'Escape' && showRangeSuggestions) {
       showRangeSuggestions = false;
       rangeInput = '';
@@ -560,40 +488,26 @@
     loadConversationHistory();
   }
   
-  // Handle incoming range selections from EstimateDisplay
   $: if ($selectedRangeStore) {
-    const isMobile = window.innerWidth < 768;
-    console.log('AgentChat received range:', $selectedRangeStore, 'Component instance for:', isMobile ? 'mobile' : 'desktop');
+    console.log('AgentChat received range:', $selectedRangeStore);
     
-    // Only process if this is the currently visible component
-    const isVisible = isMobile ? 
-      document.querySelector('[data-testid="ai-sidebar-mobile"]')?.classList.contains('translate-x-0') :
-      !document.querySelector('[data-testid="ai-sidebar-mobile"]')?.classList.contains('translate-x-0');
-    
-    console.log('Component is visible:', isVisible);
-    
-    if (isVisible) {
-      // Append to existing message instead of overwriting
-      if ($messageInput.trim() === '') {
-        $messageInput = $selectedRangeStore + ' ';
-      } else {
-        $messageInput = $messageInput.trim() + ' ' + $selectedRangeStore + ' ';
-      }
-      console.log('Updated messageInput to:', $messageInput, 'for', isMobile ? 'mobile' : 'desktop');
-      
-      // Clear the store after use (only the active component should clear it)
-      selectedRangeStore.set(null);
-      
-      // Focus on the input field and position cursor at the end
-      setTimeout(() => {
-        const input = document.querySelector('input[placeholder="Type your message..."]') as HTMLInputElement;
-        if (input) {
-          input.focus();
-          input.setSelectionRange(input.value.length, input.value.length);
-          console.log('Focused input field successfully');
-        }
-      }, 100);
+    if ($messageInput.trim() === '') {
+      $messageInput = $selectedRangeStore + ' ';
+    } else {
+      $messageInput = $messageInput.trim() + ' ' + $selectedRangeStore + ' ';
     }
+    console.log('Updated messageInput to:', $messageInput);
+    
+    selectedRangeStore.set(null);
+    
+    setTimeout(() => {
+      const input = document.querySelector('input[placeholder="Type your message..."]') as HTMLInputElement;
+      if (input) {
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+        console.log('Focused input field successfully');
+      }
+    }, 100);
   }
 </script>
 
@@ -667,13 +581,9 @@
         bind:value={$messageInput}
         on:keydown={handleKeydown}
           on:input={(e) => {
-          // If a range selection was completed, don't show suggestions until a new @ is typed
           if (rangeSelectionComplete) {
-            // Check if the current character at cursor position is @
             const input = e.target as HTMLInputElement;
             const cursorPos = input.selectionStart || 0;
-            
-            // If the user just typed @, allow new suggestions
             if (cursorPos > 0 && $messageInput.charAt(cursorPos - 1) === '@') {
               rangeSelectionComplete = false;
             } else {
@@ -681,29 +591,24 @@
             }
           }
           
-          // Check if @ was typed
           if ($messageInput.includes('@') && !showRangeSuggestions) {
             handleAtKey();
             return;
           }
           
-          // Handle input while range suggestions are shown
           if (showRangeSuggestions) {
             const cursorPos = (e.target as HTMLInputElement).selectionStart || 0;
             const textBeforeCursor = $messageInput.substring(0, cursorPos);
             const lastAt = textBeforeCursor.lastIndexOf('@');
             
             if (lastAt === -1) {
-              // No @ found, hide suggestions
               showRangeSuggestions = false;
               return;
             }
             
-            // Extract text after @ to use as filter
             const textAfterAt = textBeforeCursor.substring(lastAt + 1);
             rangeInput = textAfterAt;
             
-            // Check if it's a valid range format
             const match = textAfterAt.match(/^(\d+)(?:-(\d*))?/);
             if (match) {
               rangeStart = parseInt(match[1], 10);
@@ -728,20 +633,16 @@
                tabindex="0"
                class="p-2 hover:bg-gray-100 cursor-pointer flex items-center justify-between"
                on:mousedown|preventDefault={() => {
-                 // Find the @ symbol in the message
                  const cursorPos = (document.activeElement as HTMLInputElement)?.selectionStart || 0;
                  const textBeforeCursor = $messageInput.substring(0, cursorPos);
                  const lastAt = textBeforeCursor.lastIndexOf('@');
                  
                  if (lastAt !== -1) {
-                   // Replace the entire @... text with our formatted range
                    const beforeAt = $messageInput.substring(0, lastAt);
                    const afterAt = $messageInput.substring(lastAt).replace(/^@[^\s]*/, '');
                    const rangeText = `@${item.row}`;
                    $messageInput = `${beforeAt}${rangeText}${afterAt}`;
                    showRangeSuggestions = false;
-                   
-                   // Mark range selection as complete
                    rangeSelectionComplete = true;
                  }
                }}
@@ -761,39 +662,31 @@
               tabindex="0"
               class="p-2 bg-blue-50 hover:bg-blue-100 cursor-pointer flex items-center justify-between border-t"
               on:mousedown|preventDefault={() => {
-                // Find the @ symbol in the message
                 const cursorPos = (document.activeElement as HTMLInputElement)?.selectionStart || 0;
                 const textBeforeCursor = $messageInput.substring(0, cursorPos);
                 const lastAt = textBeforeCursor.lastIndexOf('@');
                 
                 if (lastAt !== -1) {
-                  // Get the range values
                   const [start, end] = rangeInput.split('-').map(Number);
                   if (!isNaN(start) && !isNaN(end || start)) {
-                    // Replace the entire @... text with our formatted range
                     const beforeAt = $messageInput.substring(0, lastAt);
                     const afterAt = $messageInput.substring(lastAt).replace(/^@[^\s]*/, '');
                     const rangeText = `@${start}-${end || start}`;
                     $messageInput = `${beforeAt}${rangeText}${afterAt}`;
                     showRangeSuggestions = false;
-                    
-                    // Mark range selection as complete
                     rangeSelectionComplete = true;
                   }
                 }
               }}
               on:keydown={(e) => {
                 if (e.key === 'Enter') {
-                  // Find the @ symbol in the message
                   const cursorPos = (document.activeElement as HTMLInputElement)?.selectionStart || 0;
                   const textBeforeCursor = $messageInput.substring(0, cursorPos);
                   const lastAt = textBeforeCursor.lastIndexOf('@');
                   
                   if (lastAt !== -1) {
-                    // Get the range values
                     const [start, end] = rangeInput.split('-').map(Number);
                     if (!isNaN(start) && !isNaN(end || start)) {
-                      // Replace the entire @... text with our formatted range
                       const beforeAt = $messageInput.substring(0, lastAt);
                       const afterAt = $messageInput.substring(lastAt).replace(/^@[^\s]*/, '');
                       $messageInput = `${beforeAt}@${start}-${end || start}${afterAt}`;

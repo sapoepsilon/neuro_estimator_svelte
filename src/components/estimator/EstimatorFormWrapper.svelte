@@ -174,6 +174,16 @@
     }));
   }
   
+  function openAiSidebar() {
+    isAiSidebarVisible = true;
+    window.dispatchEvent(new CustomEvent('openAiSidebar', { 
+      detail: { 
+        projectId: projectId,
+        projectName: project?.name || 'Project'
+      }
+    }));
+  }
+  
   onMount(() => {
     const handleSidebarClose = () => {
       isAiSidebarVisible = false;
@@ -195,7 +205,7 @@
   function handleKeydown(event) {
     if (event.ctrlKey && event.key === 'k') {
       event.preventDefault();
-      toggleAiSidebar();
+      openAiSidebar();
     }
   }
   
@@ -292,9 +302,9 @@
         </div>
         <button
           class="bg-primary text-white p-3 rounded-full shadow-lg hover:bg-primary/90 transition-colors z-[100] cursor-pointer"
-          on:click={toggleAiSidebar}
-          aria-label="Toggle AI Estimator"
-          data-testid="ai-sidebar-toggle-button"
+          on:click={openAiSidebar}
+          aria-label="Open AI Estimator"
+          data-testid="ai-sidebar-open-button"
           style="pointer-events: auto;"
         >
           <MessageSquare class="h-6 w-6" />
@@ -315,9 +325,9 @@
           </div>
           <button
             class="bg-primary text-white p-3 rounded-full shadow-lg hover:bg-primary/90 transition-colors z-[100] cursor-pointer"
-            on:click={toggleAiSidebar}
-            aria-label="Toggle AI Estimator"
-            data-testid="ai-sidebar-toggle-button"
+            on:click={openAiSidebar}
+            aria-label="Open AI Estimator"
+            data-testid="ai-sidebar-open-button"
             style="pointer-events: auto;"
           >
             <MessageSquare class="h-6 w-6" />
