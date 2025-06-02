@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, getContext, createEventDispatcher } from 'svelte';
-  import { Send, Loader2, X, ChevronDown } from 'lucide-svelte';
+  import { Send, Loader2, X, ChevronDown, Globe } from 'lucide-svelte';
   import { supabase } from "$lib/supabase";
   import { user } from "../../../stores/authStore";
   import { gridData, currentProjectId } from "../../../stores/gridStore";
@@ -43,7 +43,8 @@
   let rangeEnd = 0;
   let gridItems: Array<{id: string, name: string, row: number}> = [];
   let selectedRange: { start: number, end: number } | null = null;
-  let rangeSelectionComplete = false; 
+  let rangeSelectionComplete = false;
+  let webSearchEnabled = false; 
   
   $: if ($gridData && $gridData.gridSource) {
     console.log('Grid data updated:', $gridData.gridSource.length, 'items');
@@ -253,7 +254,7 @@
     rangeReferences.forEach(ref => {
       displayMessage = displayMessage.replace(
         `@${ref.range.start}-${ref.range.end}`, 
-        `<span class="bg-blue-100 text-blue-800 px-1 rounded">@${ref.range.start}-${ref.range.end}</span>`
+        `<span class="bg-accent-light text-accent-custom px-1 rounded">@${ref.range.start}-${ref.range.end}</span>`
       );
     });
     
@@ -351,7 +352,8 @@
             userId: $user?.id,
             conversationId: internalConversationId,
             ranges: rangeReferences.length > 0 ? rangeReferences.map(ref => ref.range) : undefined,
-            useMcp: true
+            useMcp: true,
+            should_use_web: webSearchEnabled
           })
         });
         
@@ -505,7 +507,6 @@
       if (input) {
         input.focus();
         input.setSelectionRange(input.value.length, input.value.length);
-        console.log('Focused input field successfully');
       }
     }, 100);
   }
@@ -576,7 +577,7 @@
     <div class="relative">
       <input
         type="text"
-        class="w-full p-2 pr-10 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+        class="w-full p-2 pr-24 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
         placeholder="Type your message..."
         bind:value={$messageInput}
         on:keydown={handleKeydown}
@@ -621,17 +622,17 @@
       />
       
       {#if showRangeSuggestions && gridItems.length > 0}
-        <div class="absolute bottom-full left-0 mb-2 w-full bg-white border border-gray-200 rounded-md shadow-lg z-10 max-h-60 overflow-y-auto">
-          <div class="p-2 border-b bg-gray-50">
-            <div class="text-xs font-medium text-gray-500">Select rows to reference</div>
+        <div class="absolute bottom-full left-0 mb-2 w-full bg-white border border-neutral-200 rounded-md shadow-lg z-10 max-h-60 overflow-y-auto">
+          <div class="p-2 border-b bg-neutral-50">
+            <div class="text-xs font-medium text-neutral-400">Select rows to reference</div>
           </div>
-          {#each gridItems as item, i}
+          {#each gridItems as item}
             {#if rangeInput === '' || String(item.row).includes(rangeInput) || 
                 (rangeInput.includes('-') && item.row >= rangeStart && item.row <= rangeEnd)}
               <div 
                role="button"
                tabindex="0"
-               class="p-2 hover:bg-gray-100 cursor-pointer flex items-center justify-between"
+               class="p-2 hover:bg-neutral-50 cursor-pointer flex items-center justify-between"
                on:mousedown|preventDefault={() => {
                  const cursorPos = (document.activeElement as HTMLInputElement)?.selectionStart || 0;
                  const textBeforeCursor = $messageInput.substring(0, cursorPos);
@@ -649,10 +650,10 @@
                on:keydown={(e) => e.key === 'Enter' && selectRange(item.row, item.row)}
               >
                 <div class="truncate">
-                  <span class="font-mono text-xs text-gray-500 mr-2">#{item.row}</span>
+                  <span class="font-mono text-xs text-neutral-400 mr-2">#{item.row}</span>
                   <span>{item.name}</span>
                 </div>
-                <ChevronDown class="h-4 w-4 text-gray-400 transform rotate-90" />
+                <ChevronDown class="h-4 w-4 text-neutral-400 transform rotate-90" />
               </div>
             {/if}
           {/each}
@@ -660,7 +661,7 @@
             <div 
               role="button"
               tabindex="0"
-              class="p-2 bg-blue-50 hover:bg-blue-100 cursor-pointer flex items-center justify-between border-t"
+              class="p-2 bg-accent-light hover:bg-accent-light cursor-pointer flex items-center justify-between border-t"
               on:mousedown|preventDefault={() => {
                 const cursorPos = (document.activeElement as HTMLInputElement)?.selectionStart || 0;
                 const textBeforeCursor = $messageInput.substring(0, cursorPos);
@@ -699,11 +700,20 @@
               <div class="font-medium">
                 Select rows {rangeInput}
               </div>
-              <ChevronDown class="h-4 w-4 text-blue-500" />
+              <ChevronDown class="h-4 w-4 text-accent-custom" />
             </div>
           {/if}
         </div>
       {/if}
+        <button
+          type="button"
+          class="absolute right-12 top-1/2 transform -translate-y-1/2 inline-flex items-center justify-center h-8 w-8 rounded-md transition-colors hover:bg-neutral-50"
+          on:click={() => webSearchEnabled = !webSearchEnabled}
+          title={webSearchEnabled ? 'Disable web search' : 'Enable web search'}
+          data-testid="web-search-toggle"
+        >
+          <Globe class="h-5 w-5 {webSearchEnabled ? 'text-accent-custom' : 'text-neutral-400'}" />
+        </button>
         <button 
           class="absolute right-2 top-1/2 transform -translate-y-1/2 inline-flex items-center justify-center h-8 w-8 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
           on:click={sendMessage}

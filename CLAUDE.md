@@ -95,6 +95,25 @@ VITE_SUPABASE_ANON_KEY # Supabase anonymous key
 - Event forwarding with `on:` directives
 - Slot-based composition for complex components
 
+### UI Guidelines
+
+- **Icons**: Always use Lucide icons for consistency
+- **Color System**: Use the refined color palette based on #FF6B6B coral red accent
+  - **Primary Accent**: `#FF6B6B` - Use for main interactive elements, web search toggle
+  - **Action Colors**: 
+    - `action-primary` (#FF6B6B) - Primary buttons, main actions
+    - `action-secondary` (#64748B) - Secondary buttons, less prominent actions  
+    - `action-success` (#059669) - Success states, export buttons
+    - `action-danger` (#DC2626) - Delete, danger actions
+  - **Neutral Colors**:
+    - `neutral-50` to `neutral-900` - Grays for text, borders, backgrounds
+    - Use instead of hardcoded `gray-*` classes
+  - **Implementation**: 
+    - Colors defined as CSS variables in app.css
+    - Available as Tailwind utility classes: `bg-action-primary`, `text-neutral-600`, etc.
+    - Avoid hardcoded hex values or arbitrary Tailwind colors
+- **Web Search Toggle**: Use Globe icon from Lucide with `accent-custom` color for enabled state
+
 ### Deployment
 
 - Static site deployment on Netlify

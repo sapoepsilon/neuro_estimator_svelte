@@ -307,7 +307,7 @@
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#6b7280',
+                  color: 'var(--neutral-400)',
                   fontSize: '12px',
                   width: '20px',
                   height: '20px'
@@ -317,12 +317,12 @@
                   handleEditColumn(currentColumn);
                 },
                 onMouseEnter: (e) => {
-                  e.target.style.backgroundColor = '#f3f4f6';
-                  e.target.style.color = '#374151';
+                  e.target.style.backgroundColor = 'var(--neutral-50)';
+                  e.target.style.color = 'var(--neutral-600)';
                 },
                 onMouseLeave: (e) => {
                   e.target.style.backgroundColor = 'transparent';
-                  e.target.style.color = '#6b7280';
+                  e.target.style.color = 'var(--neutral-400)';
                 },
                 title: 'Edit column'
               }, '⚙'),
@@ -336,7 +336,7 @@
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#6b7280',
+                  color: 'var(--neutral-400)',
                   fontSize: '12px',
                   width: '20px',
                   height: '20px'
@@ -346,12 +346,12 @@
                   handleDeleteColumn(currentColumn);
                 },
                 onMouseEnter: (e) => {
-                  e.target.style.backgroundColor = '#fef2f2';
-                  e.target.style.color = '#dc2626';
+                  e.target.style.backgroundColor = 'var(--accent-light)';
+                  e.target.style.color = 'var(--action-danger)';
                 },
                 onMouseLeave: (e) => {
                   e.target.style.backgroundColor = 'transparent';
-                  e.target.style.color = '#6b7280';
+                  e.target.style.color = 'var(--neutral-400)';
                 },
                 title: 'Delete column'
               }, '×')
@@ -417,7 +417,7 @@
             style: {
               background: 'none',
               border: 'none',
-              color: 'red',
+              color: 'var(--action-danger)',
               cursor: 'pointer',
               padding: '4px 8px',
               borderRadius: '4px',
@@ -1059,7 +1059,7 @@
           {#if rangeReference}
             <button 
               on:click={sendRangeToAI}
-              class="bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white px-3 py-2 rounded-md text-sm font-medium flex items-center justify-center shadow-sm transition-colors"
+              class="bg-action-primary hover:bg-accent-hover active:bg-accent-hover text-white px-3 py-2 rounded-md text-sm font-medium flex items-center justify-center shadow-sm transition-colors"
             >
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -1073,7 +1073,7 @@
         gridColumns,
         result.estimate?.title
       )} 
-            class="bg-green-500 hover:bg-green-600 active:bg-green-700 text-white px-3 py-2 rounded-md text-sm font-medium flex items-center justify-center shadow-sm transition-colors"
+            class="bg-action-success hover:bg-green-600 active:bg-green-700 text-white px-3 py-2 rounded-md text-sm font-medium flex items-center justify-center shadow-sm transition-colors"
           >
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -1082,7 +1082,7 @@
           </button>
           <button 
             on:click={handleAddColumn} 
-            class="bg-purple-500 hover:bg-purple-600 active:bg-purple-700 text-white px-3 py-2 rounded-md text-sm font-medium flex items-center justify-center shadow-sm transition-colors"
+            class="bg-action-secondary hover:bg-neutral-600 active:bg-neutral-600 text-white px-3 py-2 rounded-md text-sm font-medium flex items-center justify-center shadow-sm transition-colors"
           >
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V9l-6-5z" />
@@ -1092,7 +1092,7 @@
           </button>
           <button 
             on:click={toggleNewItemForm} 
-            class="bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white px-3 py-2 rounded-md text-sm font-medium flex items-center justify-center shadow-sm transition-colors"
+            class="bg-action-primary hover:bg-accent-hover active:bg-accent-hover text-white px-3 py-2 rounded-md text-sm font-medium flex items-center justify-center shadow-sm transition-colors"
           >
             {#if !showNewItemForm}
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1122,7 +1122,7 @@
             {#if rangeReference}
               <button 
                 on:click={sendRangeToAI}
-                class="bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white p-1.5 rounded-md flex items-center justify-center shadow-sm"
+                class="bg-action-primary hover:bg-accent-hover active:bg-accent-hover text-white p-1.5 rounded-md flex items-center justify-center shadow-sm"
                 aria-label="Send {rangeReference} to AI"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1136,7 +1136,7 @@
         gridColumns,
         result.estimate?.title
       )} 
-              class="bg-green-500 hover:bg-green-600 active:bg-green-700 text-white p-1.5 rounded-md flex items-center justify-center shadow-sm"
+              class="bg-action-success hover:bg-green-600 active:bg-green-700 text-white p-1.5 rounded-md flex items-center justify-center shadow-sm"
               aria-label="Export as Excel"
             >
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1145,7 +1145,7 @@
             </button>
             <button 
               on:click={handleAddColumn} 
-              class="bg-purple-500 hover:bg-purple-600 active:bg-purple-700 text-white p-1.5 rounded-md flex items-center justify-center shadow-sm"
+              class="bg-action-secondary hover:bg-neutral-600 active:bg-neutral-600 text-white p-1.5 rounded-md flex items-center justify-center shadow-sm"
               aria-label="Add new column"
             >
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1155,7 +1155,7 @@
             </button>
             <button 
               on:click={toggleNewItemForm} 
-              class="bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white p-1.5 rounded-md flex items-center justify-center shadow-sm"
+              class="bg-action-primary hover:bg-accent-hover active:bg-accent-hover text-white p-1.5 rounded-md flex items-center justify-center shadow-sm"
               aria-label="{showNewItemForm ? 'Cancel' : 'Add new item'}"
             >
               {#if !showNewItemForm}
@@ -1178,17 +1178,17 @@
           <h5 class="font-medium mb-3">Add New Estimate Item</h5>
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <div class="col-span-1 md:col-span-2">
-              <label for="item-description" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+              <label for="item-description" class="block text-sm font-medium text-neutral-600 mb-1">Description</label>
               <input 
                 id="item-description"
                 type="text" 
                 bind:value={newItem.description} 
-                class="w-full p-2 border border-gray-300 rounded-md"
+                class="w-full p-2 border border-neutral-200 rounded-md"
                 placeholder="Item description"
               />
             </div>
             <div>
-              <label for="item-quantity" class="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+              <label for="item-quantity" class="block text-sm font-medium text-neutral-600 mb-1">Quantity</label>
               <input 
                 id="item-quantity"
                 type="number" 
@@ -1196,15 +1196,15 @@
                 min="0.01" 
                 step="0.01"
                 on:input={calculateAmount}
-                class="w-full p-2 border border-gray-300 rounded-md"
+                class="w-full p-2 border border-neutral-200 rounded-md"
               />
             </div>
             <div>
-              <label for="item-unit-type" class="block text-sm font-medium text-gray-700 mb-1">Unit Type</label>
+              <label for="item-unit-type" class="block text-sm font-medium text-neutral-600 mb-1">Unit Type</label>
               <select 
                 id="item-unit-type"
                 bind:value={newItem.unitType} 
-                class="w-full p-2 border border-gray-300 rounded-md"
+                class="w-full p-2 border border-neutral-200 rounded-md"
               >
                 <option value="hour">Hour</option>
                 <option value="day">Day</option>
@@ -1216,11 +1216,11 @@
               </select>
             </div>
             <div>
-              <label for="item-cost-type" class="block text-sm font-medium text-gray-700 mb-1">Cost Type</label>
+              <label for="item-cost-type" class="block text-sm font-medium text-neutral-600 mb-1">Cost Type</label>
               <select 
                 id="item-cost-type"
                 bind:value={newItem.costType} 
-                class="w-full p-2 border border-gray-300 rounded-md"
+                class="w-full p-2 border border-neutral-200 rounded-md"
               >
                 <option value="material">Material</option>
                 <option value="labor">Labor</option>
@@ -1230,7 +1230,7 @@
               </select>
             </div>
             <div>
-              <label for="item-unit-price" class="block text-sm font-medium text-gray-700 mb-1">Unit Price</label>
+              <label for="item-unit-price" class="block text-sm font-medium text-neutral-600 mb-1">Unit Price</label>
               <input 
                 id="item-unit-price"
                 type="number" 
@@ -1238,7 +1238,7 @@
                 min="0.01" 
                 step="0.01"
                 on:input={calculateAmount}
-                class="w-full p-2 border border-gray-300 rounded-md"
+                class="w-full p-2 border border-neutral-200 rounded-md"
               />
             </div>
           </div>
@@ -1249,7 +1249,7 @@
             </div>
             <button 
               on:click={addNewItem} 
-              class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md text-sm"
+              class="bg-action-success hover:bg-green-600 text-white px-4 py-2 rounded-md text-sm"
             >
               Save Item
             </button>
@@ -1313,7 +1313,7 @@
         
         <div class="space-y-4">
           <div>
-            <label for="column-name" class="block text-sm font-medium text-gray-700 mb-1">
+            <label for="column-name" class="block text-sm font-medium text-neutral-600 mb-1">
               Column Name
             </label>
             <input
@@ -1321,18 +1321,18 @@
               type="text"
               bind:value={newColumn.column_name}
               placeholder="Enter column name"
-              class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              class="w-full p-2 border border-neutral-200 rounded-md focus:ring-2 focus:ring-action-primary focus:border-action-primary"
             />
           </div>
           
           <div>
-            <label for="data-type" class="block text-sm font-medium text-gray-700 mb-1">
+            <label for="data-type" class="block text-sm font-medium text-neutral-600 mb-1">
               Data Type
             </label>
             <select
               id="data-type"
               bind:value={newColumn.data_type}
-              class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              class="w-full p-2 border border-neutral-200 rounded-md focus:ring-2 focus:ring-action-primary focus:border-action-primary"
             >
               <option value="text">Text</option>
               <option value="number">Number</option>
@@ -1349,9 +1349,9 @@
               id="is-required"
               type="checkbox"
               bind:checked={newColumn.is_required}
-              class="mr-2 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              class="mr-2 rounded border-neutral-200 text-action-primary focus:ring-action-primary"
             />
-            <label for="is-required" class="text-sm font-medium text-gray-700">
+            <label for="is-required" class="text-sm font-medium text-neutral-600">
               Required field
             </label>
           </div>
@@ -1360,7 +1360,7 @@
         <div class="flex gap-3 mt-6 pt-4 border-t">
           <button
             on:click={() => showColumnDialog = false}
-            class="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+            class="flex-1 px-4 py-2 text-neutral-600 bg-neutral-100 rounded-md hover:bg-neutral-200 transition-colors"
           >
             Cancel
           </button>

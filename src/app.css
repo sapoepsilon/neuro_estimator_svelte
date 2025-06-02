@@ -43,6 +43,28 @@
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Custom accent color for web search and interactive elements */
+    --accent-custom: #FF6B6B;
+    
+    /* Refined color system based on accent */
+    --accent: #FF6B6B;
+    --accent-hover: #FF5252;
+    --accent-light: #FFEBEE;
+    
+    /* Neutral palette */
+    --neutral-50: #F8FAFC;
+    --neutral-100: #F1F5F9;
+    --neutral-200: #E2E8F0;
+    --neutral-400: #94A3B8;
+    --neutral-600: #475569;
+    --neutral-900: #0F172A;
+    
+    /* Action colors */
+    --action-primary: #FF6B6B;
+    --action-secondary: #64748B;
+    --action-success: #059669;
+    --action-danger: #DC2626;
   }
 
   .dark {
@@ -83,6 +105,28 @@
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Custom accent color for web search and interactive elements */
+    --accent-custom: #FF6B6B;
+    
+    /* Refined color system based on accent */
+    --accent: #FF6B6B;
+    --accent-hover: #FF5252;
+    --accent-light: #FFEBEE;
+    
+    /* Neutral palette */
+    --neutral-50: #F8FAFC;
+    --neutral-100: #F1F5F9;
+    --neutral-200: #E2E8F0;
+    --neutral-400: #94A3B8;
+    --neutral-600: #475569;
+    --neutral-900: #0F172A;
+    
+    /* Action colors */
+    --action-primary: #FF6B6B;
+    --action-secondary: #64748B;
+    --action-success: #059669;
+    --action-danger: #DC2626;
   }
 }
 
@@ -92,6 +136,25 @@
   }
   body {
     @apply bg-[hsl(var(--background))] text-[hsl(var(--foreground))];
+  }
+  
+  /* Input focus styles using our color system */
+  input:focus,
+  textarea:focus,
+  select:focus {
+    outline: none !important;
+    border-color: var(--action-primary) !important;
+    box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.1) !important;
+  }
+  
+  /* Specific focus styles for different input types */
+  input[type="text"]:focus,
+  input[type="email"]:focus,
+  input[type="password"]:focus,
+  input[type="number"]:focus,
+  textarea:focus {
+    border-color: var(--action-primary) !important;
+    box-shadow: 0 0 0 2px rgba(255, 107, 107, 0.2) !important;
   }
 }
 
@@ -112,7 +175,8 @@
   }
 
   /* Prevent scrolling on main containers */
-  body, html {
+  body,
+  html {
     overflow: hidden;
     height: 100%;
     position: fixed;

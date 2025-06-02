@@ -2,6 +2,7 @@
   import { user } from '../../stores/authStore';
   import { supabase } from '$lib/supabase';
   import { onMount } from 'svelte';
+  import { Globe } from 'lucide-svelte';
   import StreamingEstimateView from './StreamingEstimateView.svelte';
   import LoginDialog from '../auth/LoginDialog.svelte';
 
@@ -20,6 +21,9 @@
   
   // Login dialog state
   let showLoginDialog = false;
+  
+  // Web search state
+  let webSearchEnabled = false;
 
   onMount(() => {
     if (projectData) {
@@ -119,6 +123,7 @@
   <StreamingEstimateView 
     projectDetails={streamingProjectDetails}
     additionalRequirements=""
+    webSearchEnabled={webSearchEnabled}
     onComplete={handleStreamingComplete}
     onCancel={handleStreamingCancel}
   />
@@ -172,6 +177,20 @@
             {error}
           </div>
         {/if}
+        
+        <!-- Web Search Toggle -->
+        <div class="flex justify-center mt-4">
+          <button
+            type="button"
+            class="inline-flex items-center gap-2 px-3 py-2 rounded-md transition-colors text-sm font-medium hover:bg-gray-100"
+            on:click={() => webSearchEnabled = !webSearchEnabled}
+            title={webSearchEnabled ? 'Disable internet use' : 'Enable internet use'}
+            data-testid="web-search-toggle"
+          >
+            <Globe class="h-4 w-4 {webSearchEnabled ? 'text-accent-custom' : 'text-gray-400'}" />
+            <span class="{webSearchEnabled ? 'text-accent-custom' : 'text-gray-600'}">{webSearchEnabled ? 'Internet use enabled' : 'Enable internet use'}</span>
+          </button>
+        </div>
       </div>
 
       <!-- Helper text -->

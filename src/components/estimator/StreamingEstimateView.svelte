@@ -5,6 +5,7 @@
 
   export let projectDetails = null;
   export let additionalRequirements = '';
+  export let webSearchEnabled = false;
   export let onComplete = null; // Callback when streaming completes
   export let onCancel = null; // Callback when user cancels
 
@@ -150,7 +151,8 @@
 
       const requestData = {
         projectDetails,
-        additionalRequirements
+        additionalRequirements,
+        should_use_web: webSearchEnabled
       };
       
       console.log('📦 Request data prepared:', requestData);
