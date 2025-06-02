@@ -320,7 +320,7 @@
 
 {#if isMobile && sidebarVisible}
   <div 
-    class="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 transition-opacity duration-300 ease-in-out"
+    class="fixed inset-0 bg-black/40 backdrop-blur-sm z-99 transition-opacity duration-300 ease-in-out"
     on:click={() => sidebarVisible = false}
     on:keydown={(e) => e.key === 'Escape' && (sidebarVisible = false)}
     role="button"
@@ -330,7 +330,7 @@
 {/if}
 
 <div 
-  class="h-full flex flex-col border-r bg-background shadow-lg {isResizing ? '' : 'transition-all duration-300 ease-in-out'} {isMobile ? 'fixed z-50 top-0 bottom-0 max-h-screen overflow-hidden' : 'relative'}"
+  class="h-full flex flex-col border-r bg-background shadow-lg {isResizing ? '' : 'transition-all duration-300 ease-in-out'} {isMobile ? 'fixed z-[1200] top-0 bottom-0 max-h-screen overflow-hidden' : 'relative'}"
   style="{isMobile ? `width: 280px; transform: translateX(${sidebarVisible ? '0' : '-100%'}); left: 0;` : `width: ${width}; min-width: ${width}; max-width: ${width};`}"
   class:pointer-events-none={isMobile && !sidebarVisible}
 >
