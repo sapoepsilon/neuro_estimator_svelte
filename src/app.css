@@ -45,26 +45,26 @@
     --sidebar-ring: 217.2 91.2% 59.8%;
 
     /* Custom accent color for web search and interactive elements */
-    --accent-custom: #FF6B6B;
-    
+    --accent-custom: #ff6b6b;
+
     /* Refined color system based on accent */
-    --accent: #FF6B6B;
-    --accent-hover: #FF5252;
-    --accent-light: #FFEBEE;
-    
+    --accent: #ff6b6b;
+    --accent-hover: #ff5252;
+    --accent-light: #ffebee;
+
     /* Neutral palette */
-    --neutral-50: #F8FAFC;
-    --neutral-100: #F1F5F9;
-    --neutral-200: #E2E8F0;
-    --neutral-400: #94A3B8;
+    --neutral-50: #f8fafc;
+    --neutral-100: #f1f5f9;
+    --neutral-200: #e2e8f0;
+    --neutral-400: #94a3b8;
     --neutral-600: #475569;
-    --neutral-900: #0F172A;
-    
+    --neutral-900: #0f172a;
+
     /* Action colors */
-    --action-primary: #FF6B6B;
-    --action-secondary: #64748B;
+    --action-primary: #ff6b6b;
+    --action-secondary: #64748b;
     --action-success: #059669;
-    --action-danger: #DC2626;
+    --action-danger: #dc2626;
   }
 
   .dark {
@@ -107,26 +107,26 @@
     --sidebar-ring: 217.2 91.2% 59.8%;
 
     /* Custom accent color for web search and interactive elements */
-    --accent-custom: #FF6B6B;
-    
+    --accent-custom: #ff6b6b;
+
     /* Refined color system based on accent */
-    --accent: #FF6B6B;
-    --accent-hover: #FF5252;
-    --accent-light: #FFEBEE;
-    
+    --accent: #ff6b6b;
+    --accent-hover: #ff5252;
+    --accent-light: #ffebee;
+
     /* Neutral palette */
-    --neutral-50: #F8FAFC;
-    --neutral-100: #F1F5F9;
-    --neutral-200: #E2E8F0;
-    --neutral-400: #94A3B8;
+    --neutral-50: #f8fafc;
+    --neutral-100: #f1f5f9;
+    --neutral-200: #e2e8f0;
+    --neutral-400: #94a3b8;
     --neutral-600: #475569;
-    --neutral-900: #0F172A;
-    
+    --neutral-900: #0f172a;
+
     /* Action colors */
-    --action-primary: #FF6B6B;
-    --action-secondary: #64748B;
+    --action-primary: #ff6b6b;
+    --action-secondary: #64748b;
     --action-success: #059669;
-    --action-danger: #DC2626;
+    --action-danger: #dc2626;
   }
 }
 
@@ -134,10 +134,11 @@
   * {
     @apply border-[hsl(var(--border))];
   }
+  
   body {
     @apply bg-[hsl(var(--background))] text-[hsl(var(--foreground))];
   }
-  
+
   /* Input focus styles using our color system */
   input:focus,
   textarea:focus,
@@ -146,7 +147,7 @@
     border-color: var(--action-primary) !important;
     box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.1) !important;
   }
-  
+
   /* Specific focus styles for different input types */
   input[type="text"]:focus,
   input[type="email"]:focus,
@@ -158,66 +159,3 @@
   }
 }
 
-/* RevoGrid styles for consistent grid display across the application */
-.grid-container {
-  height: calc(100vh - 200px); /* Adjust this value based on your layout */
-  min-height: 500px;
-  width: 100%;
-  position: relative;
-  overflow: hidden; /* Prevent container scrolling */
-}
-
-/* Mobile-specific styles to ensure only the grid scrolls */
-@media (max-width: 768px) {
-  .grid-container {
-    height: calc(100vh - 150px); /* Slightly more space on mobile */
-    overflow: visible; /* Allow the grid to handle its own scrolling */
-  }
-
-  /* Prevent scrolling on main containers */
-  body,
-  html {
-    overflow: hidden;
-    height: 100%;
-    position: fixed;
-    width: 100%;
-  }
-
-  /* Allow only the grid viewport to scroll */
-  .grid-container .rgViewport {
-    overflow-y: auto !important;
-  }
-
-  /* Specific styles for our mobile grid container */
-  .mobile-grid-container {
-    position: relative;
-    z-index: 10; /* Ensure grid is above other elements */
-    max-height: calc(100vh - 150px);
-  }
-}
-
-/* Override RevoGrid's default height settings */
-.grid-container revo-grid {
-  height: 100% !important;
-  min-height: 100% !important;
-  width: 100% !important;
-  display: flex !important;
-  flex-direction: column !important;
-}
-
-.grid-container .rgViewport {
-  height: 100% !important;
-  flex: 1 !important;
-}
-
-.grid-container .main-viewport {
-  height: 100% !important;
-}
-
-.grid-container .vertical-inner {
-  height: 100% !important;
-}
-
-.grid-container .horizontal-inner {
-  width: 100% !important;
-}

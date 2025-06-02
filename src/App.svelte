@@ -146,7 +146,7 @@
 </script>
 
 
-  <div class="flex h-screen w-full overflow-hidden">
+  <div class="flex h-dvh w-full overflow-hidden">
     <AppSidebar bind:sidebarVisible={showMobileSidebar} {openLoginDialog} />
     <div class="flex-1 flex flex-col overflow-hidden relative">
       <div class="flex items-center relative z-50">
@@ -159,8 +159,8 @@
         </button>
         <Navbar openLoginDialog={openLoginDialog} />
       </div>
-      <div class="flex-1 flex overflow-hidden">
-        <main class="flex-1 overflow-auto">
+      <div class="flex-1 flex overflow-hidden border">
+        <main class="flex-1 overflow-auto bg-transparent opacity-1">
           <Router {routes} />
         </main>
         <AiSidebar 

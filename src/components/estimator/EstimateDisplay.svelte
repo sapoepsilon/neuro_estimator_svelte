@@ -8,6 +8,7 @@
   import { selectedRange as selectedRangeStore } from '../../stores/rangeSelectionStore';
   import { toast } from "svelte-sonner";
   import { exportToExcel } from '$lib/utils';
+  import '$lib/styles/revogrid.css';
 
   export let result: any = null;
   export let projectId: string | null = null;
@@ -103,18 +104,20 @@
         setTimeout(() => {
           const gridContainer = document.querySelector('.grid-container');
           if (gridContainer) {
-            gridContainer.addEventListener('touchmove', (e) => {
+            // Less aggressive touch handling - only prevent conflicts during editing
+            gridContainer.addEventListener('touchstart', (e) => {
               const target = e.target as HTMLElement;
-              if (target && target.closest && target.closest('.revogr-cell')) {
+              if (target && target.closest && target.closest('.revogr-edit')) {
                 e.stopPropagation();
               }
             }, { passive: true });
             
+            // Simplified touch end for cell selection
             gridContainer.addEventListener('touchend', (e) => {
               const target = e.target as HTMLElement;
               if (target && target.closest) {
                 const cell = target.closest('.revogr-cell') as HTMLElement;
-                if (cell) {
+                if (cell && !target.closest('.revogr-edit')) {
                   setTimeout(() => {
                     cell.click();
                   }, 10);
@@ -941,108 +944,10 @@
   
 </script>
 
-<style>
-  /* Style for editable cells */
-  :global(.revogr-edit) {
-    color: #1f2937 !important; /* Dark gray for better contrast */
-    background-color: #ffffff !important; /* White background */
-    border: 1px solid #4299e1 !important;
-    padding: 4px 8px !important;
-    border-radius: 4px !important;
-    box-shadow: 0 0 0 2px rgba(66, 153, 225, 0.2) !important;
-  } 
-  
-  :global(.revogr-focus) {
-    border-color: #4299e1 !important;
-    box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.3) !important;
-  }
-  
-  :global(.revo-dropdown-list) {
-    color: #000 !important;
-    background-color: #fff !important;
-    max-height: 200px !important;
-    overflow-y: auto !important;
-    z-index: 1000 !important;
-  }
-  
-  /* Make grid container take up available vertical space */
-  .grid-container {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    height: auto;
-  }
-  
-  /* Responsive grid height */
-  @media (max-width: 640px) {
-    .grid-container {
-      height: 500px;
-      min-height: 300px;
-      max-height: 70vh;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
-    }
-    
-    /* Improve mobile grid behavior */
-    :global(.grid-container > .revogr-holder) {
-      overflow: visible !important;
-      touch-action: manipulation; /* Improve touch handling */
-    }
-    
-    /* Prevent focus loss on touch */
-    :global(.revogr-focus) {
-      outline: 2px solid #4299e1 !important;
-      outline-offset: -2px;
-      z-index: 5 !important;
-    }
-    
-    /* Improve touch targets for better usability */
-    :global(.revogr-cell) {
-      min-height: 44px !important; /* Minimum touch target size */
-    }
-  }
-  
-  @media (min-width: 641px) {
-    .grid-container {
-      height: 700px; /* Fixed height to enable scrolling */
-      min-height: 600px;
-      max-height: 90vh; /* Limit maximum height */
-      overflow-y: auto; /* Enable vertical scrolling */
-      padding-bottom: 50px; /* Add some padding at the bottom */
-    }
-  }
-  
-  /* Ensure RevoGrid takes full height of its container */
-  :global(.grid-container > .revogr-holder) {
-    flex: 1;
-    height: 100% !important;
-    position: relative;
-  }
-  
-  /* Fix horizontal scrollbar position */
-  :global(.revogr-horizontal-scrollable) {
-    position: sticky !important;
-    bottom: 0 !important;
-    z-index: 10 !important;
-    background-color: white;
-  }
-  
-  /* Mobile horizontal scrollbar adjustments */
-  @media (max-width: 640px) {
-    :global(.revogr-horizontal-scrollable) {
-      position: relative !important;
-      bottom: auto !important;
-    }
-  }
-  
-  :global(.revo-dropdown-list .selected) {
-    background-color: #4299e1 !important;
-    color: white !important;
-  }
-</style>
 
 {#if gridSource.length > 0}
-  <div class="bg-white rounded-md shadow mb-4 flex flex-col">
+  <div class="flex flex-col">
+    <div class="rounded-md shadow mb-4 flex flex-col flex-shrink-0">
     <div class="p-3 sm:p-4 bg-slate-50 rounded-t-md border-b">
       <!-- Desktop layout - Optimized for better space utilization -->
       <div class="hidden sm:flex items-center justify-between gap-4 w-full">
@@ -1258,7 +1163,7 @@
       {/if}
     </div>
   </div>
-  <div class="grid-container flex-1 bg-white rounded-md overflow-hidden mobile-grid-container relative" bind:this={gridContainer} on:mouseup={handleMouseUp} role="grid" tabindex="0">
+  <div class="grid-container flex-1 h-[calc(90dvh-100px)] rounded-md overflow-hidden mobile-grid-container relative" bind:this={gridContainer} on:mouseup={handleMouseUp} role="grid" tabindex="0">
     <RevoGrid
       bind:this={revoGridInstance}
       source={gridSource} 
@@ -1295,6 +1200,7 @@
         return '';
       }}
     />
+  </div>
   </div>
 {:else}
   <div class="bg-slate-50 p-4 rounded-md">
