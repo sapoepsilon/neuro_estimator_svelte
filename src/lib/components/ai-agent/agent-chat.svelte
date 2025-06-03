@@ -41,7 +41,7 @@
   let showRangeSuggestions = false;
   let rangeStart = 0;
   let rangeEnd = 0;
-  let gridItems: Array<{id: string, name: string, row: number}> = [];
+  let gridItems: Array<{id: string, name: string, row: number, rowNumber?: number}> = [];
   let selectedRange: { start: number, end: number } | null = null;
   let rangeSelectionComplete = false;
   let webSearchEnabled = false; 
@@ -53,7 +53,8 @@
       .map((item: any, index: number) => ({
         id: item.id || `row-${index}`,
         name: item.description || `Item ${index + 1}`,
-        row: index + 1
+        row: index + 1,  // Grid position (what user sees)
+        rowNumber: item.rowNumber || item.row_number // Database row number
       }));
     console.log('Processed grid items:', gridItems.length);
   }
@@ -241,10 +242,26 @@
     if (!$messageInput.trim() || !$user) return;
     showRangeSuggestions = false;
     const rangeReferences: Array<{range: {start: number, end: number}, text: string}> = [];
+    const rowNumbers: number[] = [];
+    
     const messageWithRanges = $messageInput.replace(/@(\d+)(?:-(\d+))?/g, (match, start, end) => {
+      const gridStart = parseInt(start, 10);
+      const gridEnd = end ? parseInt(end, 10) : gridStart;
+      
+      // Convert grid positions to database row numbers
+      const selectedGridItems = gridItems.filter(item => 
+        item.row >= gridStart && item.row <= gridEnd
+      );
+      
+      selectedGridItems.forEach(item => {
+        if (item.rowNumber && !rowNumbers.includes(item.rowNumber)) {
+          rowNumbers.push(item.rowNumber);
+        }
+      });
+      
       const range = {
-        start: parseInt(start, 10),
-        end: end ? parseInt(end, 10) : parseInt(start, 10)
+        start: gridStart,
+        end: gridEnd
       };
       const rangeId = `range_${range.start}_${range.end}`;
       rangeReferences.push({ range, text: `[Rows ${range.start}-${range.end}]` });
@@ -351,7 +368,7 @@
             prompt: messageWithRanges,
             userId: $user?.id,
             conversationId: internalConversationId,
-            ranges: rangeReferences.length > 0 ? rangeReferences.map(ref => ref.range) : undefined,
+            rowNumbers: rowNumbers.length > 0 ? rowNumbers : undefined,
             useMcp: true,
             should_use_web: webSearchEnabled
           })

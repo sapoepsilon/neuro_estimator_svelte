@@ -109,7 +109,6 @@
     const lineItems = estimateItems.map(item => {
       return {
         ...item, // This includes row_number and all column values
-        description: item.description || item.title || '', // Support both column names
         subItems: [] // No sub-items in the new structure
       };
     });
@@ -157,7 +156,10 @@
       if ($user) {
         estimateItems = [];
         project = null;
-        loadData();
+        loadData().then(() => {
+          // Open AI sidebar after data is loaded
+          openAiSidebar();
+        });
       }
     }
   }

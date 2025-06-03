@@ -4,7 +4,7 @@
   import { createEventDispatcher } from 'svelte';
   import { supabase } from '$lib/supabase';
   import { user } from '../../stores/authStore';
-  import { gridData, currentProjectId } from '../../stores/gridStore';
+  import { gridData, currentProjectId, type GridItem } from '../../stores/gridStore';
   import { selectedRange as selectedRangeStore } from '../../stores/rangeSelectionStore';
   import { toast } from "svelte-sonner";
   import { exportToExcel } from '$lib/utils';
@@ -85,8 +85,10 @@
   };
 
   type LineItem = {
-    id: number | null;
+    id: number | string | null;
     row_number: number;
+    gridPosition?: number;  // Display position in grid (1, 2, 3...)
+    rowNumber?: number;     // Database row_number (9, 10, 11...)
     subItems: any[];
     [key: string]: any;
   };
@@ -166,49 +168,132 @@
       
       if (columnsError) throw columnsError;
       
-      // Fetch estimate items with row_number and column_id
-      const { data: estimateItems, error: itemsError } = await supabase
+      // Get distinct row numbers for this project
+      const { data: rowNumbers, error: rowNumbersError } = await supabase
         .from('estimate_items')
-        .select('*')
+        .select('row_number')
         .eq('project_id', id)
-        .order('row_number', { ascending: true })
-        .order('column_id', { ascending: true });
-     
+        .order('row_number', { ascending: true });
       
-      if (itemsError) throw itemsError; 
-
-      const itemsByRow: Record<number, EstimateItem[]> = estimateItems.reduce<Record<number, EstimateItem[]>>((acc, item) => {
-        if (!acc[item.row_number]) {
-          acc[item.row_number] = [];
+      if (rowNumbersError) throw rowNumbersError;
+      
+      // Extract unique row numbers
+      const uniqueRowNumbers = [...new Set(rowNumbers.map(r => r.row_number))];
+      
+      // Try the new database function first
+      let structuredItems = null;
+      let itemsError = null;
+      
+      try {
+        const { data, error } = await supabase
+          .rpc('get_project_items_by_row_numbers', {
+            project_id_param: parseInt(id),
+            row_numbers: uniqueRowNumbers
+          });
+        
+        structuredItems = data;
+        itemsError = error;
+        
+        
+        if (itemsError) {
+          console.error('Database function error:', itemsError);
+          throw itemsError;
         }
-        acc[item.row_number].push(item);
-        return acc;
-      }, {});
-
-      const lineItems: LineItem[] = Object.entries(itemsByRow).map(([rowNumber, rowItems]) => {
-        const rowData: LineItem = {
-          id: null,
-          row_number: parseInt(rowNumber),
-          subItems: [],
-          amount: 0
-        };
-
-        rowItems.forEach((item: EstimateItem) => {
-          const column = projectColumns.find((col: ColumnDefinition) => col.id === item.column_id);
-          if (column) {
-            if (['quantity', 'unit_price', 'amount'].includes(column.column_name)) {
-              rowData[column.column_name] = parseFloat(item.value) || 0;
-            } else {
-              rowData[column.column_name] = item.value;
-            }
-            
-            if (!rowData.id) {
-              rowData.id = item.id;
-            }
+        
+        if (!structuredItems || structuredItems.length === 0) {
+          console.warn('Database function returned empty results, falling back to EAV query');
+          throw new Error('Empty results from function');
+        }
+        
+      } catch (functionError) {
+        console.warn('Database function failed, falling back to traditional EAV query:', functionError);
+        
+        // Fallback to the old EAV method
+        const { data: estimateItems, error: eavError } = await supabase
+          .from('estimate_items')
+          .select('*')
+          .eq('project_id', id)
+          .order('row_number', { ascending: true })
+          .order('column_id', { ascending: true });
+        
+        if (eavError) throw eavError;
+        
+        const itemsByRow: Record<number, EstimateItem[]> = estimateItems.reduce<Record<number, EstimateItem[]>>((acc, item) => {
+          if (!acc[item.row_number]) {
+            acc[item.row_number] = [];
           }
-        });
+          acc[item.row_number].push(item);
+          return acc;
+        }, {});
 
-        return rowData;
+        structuredItems = Object.entries(itemsByRow).map(([rowNumber, rowItems]) => {
+          const item: any = {};
+          rowItems.forEach((dbItem: EstimateItem) => {
+            const column = projectColumns.find((col: ColumnDefinition) => col.id === dbItem.column_id);
+            if (column) {
+              item[column.column_name] = dbItem.value;
+            }
+          });
+          
+          return {
+            row_number: parseInt(rowNumber),
+            item: item
+          };
+        });
+      }
+      
+      // Transform the structured data into LineItems with grid positions
+      const lineItems: LineItem[] = structuredItems.map((dbResult: any, index: number) => {
+        // Handle different possible response structures
+        let item, rowNumber;
+        
+        if (dbResult.get_project_items_by_row_numbers) {
+          // Structure when function returns named column
+          const dbItem = dbResult.get_project_items_by_row_numbers;
+          item = dbItem.item;
+          rowNumber = dbItem.row_number;
+        } else if (dbResult.item && typeof dbResult.row_number !== 'undefined') {
+          // Direct structure (from fallback or direct function response)
+          item = dbResult.item;
+          rowNumber = dbResult.row_number;
+        } else {
+          // Fallback - treat the result as the item itself
+          console.warn('Unexpected structure, using entire object as item:', dbResult);
+          item = dbResult;
+          rowNumber = dbResult.row_number || index + 1;
+        }
+        
+        if (!item) {
+          console.error('Item is null or undefined for dbResult:', dbResult);
+          throw new Error(`Item data is missing for row ${rowNumber}`);
+        }
+        
+        // Create line item with both grid position and row number
+        const lineItem: LineItem = {
+          id: item.parent_item_id || `row-${rowNumber}`,
+          row_number: rowNumber,
+          gridPosition: index + 1, // This is the display position (1, 2, 3...)
+          rowNumber: rowNumber,    // This is the database row_number (9, 10, 11...)
+          subItems: []
+        };
+        
+        // Dynamically map all columns from the item to the lineItem
+        for (const [columnName, value] of Object.entries(item)) {
+          if (columnName === 'parent_item_id') {
+            // Already handled above
+            continue;
+          }
+          
+          // Handle numeric columns
+          if (['quantity', 'unit_price', 'amount'].includes(columnName)) {
+            lineItem[columnName] = parseFloat(value as string) || 0;
+          } else {
+            // Handle all other columns as strings
+            lineItem[columnName] = value || '';
+          }
+        }
+        
+        return lineItem;
       });
 
       const formattedResult = {
@@ -443,6 +528,8 @@
       const rowItem = { 
         id: item.id,
         isHeader: true,
+        gridPosition: item.gridPosition || (index + 1), // Ensure we have gridPosition
+        rowNumber: item.rowNumber || item.row_number,   // Ensure we have rowNumber
         ...item 
       };
       
@@ -1163,7 +1250,7 @@
       {/if}
     </div>
   </div>
-  <div class="grid-container flex-1 h-[calc(90dvh-100px)] rounded-md overflow-hidden mobile-grid-container relative" bind:this={gridContainer} on:mouseup={handleMouseUp} role="grid" tabindex="0">
+  <div class="flex h-[calc(90dvh-100px)] rounded-md overflow-hidden relative" bind:this={gridContainer} on:mouseup={handleMouseUp} role="grid" tabindex="0">
     <RevoGrid
       bind:this={revoGridInstance}
       source={gridSource} 
