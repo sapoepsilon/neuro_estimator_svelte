@@ -134,28 +134,8 @@
   * {
     @apply border-[hsl(var(--border))];
   }
-  
+
   body {
     @apply bg-[hsl(var(--background))] text-[hsl(var(--foreground))];
   }
-
-  /* Input focus styles using our color system */
-  input:focus,
-  textarea:focus,
-  select:focus {
-    outline: none !important;
-    border-color: var(--action-primary) !important;
-    box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.1) !important;
-  }
-
-  /* Specific focus styles for different input types */
-  input[type="text"]:focus,
-  input[type="email"]:focus,
-  input[type="password"]:focus,
-  input[type="number"]:focus,
-  textarea:focus {
-    border-color: var(--action-primary) !important;
-    box-shadow: 0 0 0 2px rgba(255, 107, 107, 0.2) !important;
-  }
 }
-
