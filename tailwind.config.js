@@ -47,6 +47,21 @@ const config = {
 				card: {
 					DEFAULT: "hsl(var(--card) / <alpha-value>)",
 					foreground: "hsl(var(--card-foreground) / <alpha-value>)"
+				},
+				"accent-custom": "var(--accent-custom)",
+				"neutral": {
+					50: "var(--neutral-50)",
+					100: "var(--neutral-100)",
+					200: "var(--neutral-200)",
+					400: "var(--neutral-400)",
+					600: "var(--neutral-600)",
+					900: "var(--neutral-900)"
+				},
+				"action": {
+					primary: "var(--action-primary)",
+					secondary: "var(--action-secondary)",
+					success: "var(--action-success)",
+					danger: "var(--action-danger)"
 				}
 			},
 			borderRadius: {

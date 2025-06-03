@@ -3,16 +3,31 @@
   import { onMount, setContext } from 'svelte';
   import { createEventDispatcher } from 'svelte';
   import { supabase } from '$lib/supabase';
-  import * as XLSX from 'xlsx';
   import { user } from '../../stores/authStore';
-  import { gridData, currentProjectId } from '../../stores/gridStore';
+  import { gridData, currentProjectId, type GridItem } from '../../stores/gridStore';
+  import { selectedRange as selectedRangeStore } from '../../stores/rangeSelectionStore';
   import { toast } from "svelte-sonner";
+  import { exportToExcel } from '$lib/utils';
+  import '$lib/styles/revogrid.css';
 
   export let result: any = null;
   export let projectId: string | null = null;
   let gridSource: any[] = [];
   let gridColumns: any[] = [];
   let showNewItemForm = false;
+  let showColumnDialog = false;
+  let columnDialogMode = 'add'; // 'add' or 'edit'
+  let editingColumn = null;
+  let gridContainer = null;
+  let revoGridInstance = null;
+  let currentSelection = null;
+  let rangeReference = null;
+  let newColumn = {
+    column_name: '',
+    data_type: 'text',
+    is_required: false,
+    position: 0
+  };
   let newItem = {
     description: '',
     quantity: 1,
@@ -21,17 +36,12 @@
     amount: 0,
     costType: 'material'
   };
-  
   const dispatch = createEventDispatcher();
-  
   const COLUMN_WIDTHS_KEY = 'neuro-estimator-column-widths';
-  
-  // Create a context for grid data access
   setContext('getGridData', () => {
     return { gridSource, gridColumns };
   });
   
-  // Update the grid store whenever data changes
   $: {
     $gridData = { gridSource, gridColumns };
     $currentProjectId = projectId;
@@ -47,13 +57,40 @@
     filter?: boolean;
     columnType?: string;
     cellTemplate?: (h: any, props: any) => any;
-    editor?: boolean | string;
-    editorSource?: Array<{label: string, value: string}>;
     readonly?: boolean | ((props: any) => boolean);
   };
   
   type ColumnResizeDetail = {
     [index: number]: ColumnRegular;
+  };
+
+  type EstimateItem = {
+    id: number;
+    project_id: number;
+    row_number: number;
+    column_id: number;
+    value: string;
+    created_at: string;
+    updated_at: string;
+  };
+
+  type ColumnDefinition = {
+    id: number;
+    project_id: number;
+    column_name: string;
+    data_type: string;
+    is_required: boolean;
+    position: number;
+    created_at: string;
+  };
+
+  type LineItem = {
+    id: number | string | null;
+    row_number: number;
+    gridPosition?: number;  // Display position in grid (1, 2, 3...)
+    rowNumber?: number;     // Database row_number (9, 10, 11...)
+    subItems: any[];
+    [key: string]: any;
   };
   
   onMount(() => {
@@ -62,30 +99,27 @@
       loadProjectData(projectId);
     }
     
-    // Improve mobile touch handling
     if (typeof window !== 'undefined') {
       const isMobile = window.matchMedia('(max-width: 640px)').matches;
       
       if (isMobile) {
-        // Add a small delay to handle touch events better
         setTimeout(() => {
           const gridContainer = document.querySelector('.grid-container');
           if (gridContainer) {
-            // Prevent default touch behavior that might cause focus issues
-            gridContainer.addEventListener('touchmove', (e) => {
+            // Less aggressive touch handling - only prevent conflicts during editing
+            gridContainer.addEventListener('touchstart', (e) => {
               const target = e.target as HTMLElement;
-              if (target && target.closest && target.closest('.revogr-cell')) {
+              if (target && target.closest && target.closest('.revogr-edit')) {
                 e.stopPropagation();
               }
             }, { passive: true });
             
-            // Ensure cells maintain focus on touch
+            // Simplified touch end for cell selection
             gridContainer.addEventListener('touchend', (e) => {
               const target = e.target as HTMLElement;
               if (target && target.closest) {
                 const cell = target.closest('.revogr-cell') as HTMLElement;
-                if (cell) {
-                  // Small delay to ensure the touch event completes
+                if (cell && !target.closest('.revogr-edit')) {
                   setTimeout(() => {
                     cell.click();
                   }, 10);
@@ -96,30 +130,27 @@
         }, 500);
       }
     }
+    
   });
   
   $: if (result && result.estimate && result.estimate.lineItems) {
     prepareGridData(result);
   }
   
-  // Track previous projectId to prevent unnecessary reloads
   let previousProjectId: string | null = null;
   
   $: if (projectId && projectId !== previousProjectId) {
-    // Only update when projectId actually changes to a new value
     console.log('ProjectId changed from', previousProjectId, 'to', projectId);
     previousProjectId = projectId;
     loadProjectData(projectId);
   }
   
-  // Function to load project data from the database
   async function loadProjectData(id: string) {
     if (!id) return;
     
     try {
       console.log('Loading project data for ID:', id);
       
-      // Fetch the project data from Supabase
       const { data: projectData, error: projectError } = await supabase
         .from('projects')
         .select('*')
@@ -128,41 +159,154 @@
       
       if (projectError) throw projectError;
       console.log('Project data loaded:', projectData);
-      
-      // Fetch the estimate items for this project
-      const { data: estimateItems, error: itemsError } = await supabase
-        .from('estimate_items')
+     
+      const {data: projectColumns, error: columnsError} = await supabase
+        .from('estimate_columns')
         .select('*')
         .eq('project_id', id)
-        .order('created_at', { ascending: true });
+        .order('position', { ascending: true });
       
-      if (itemsError) throw itemsError;
-      console.log('Estimate items loaded:', estimateItems);
+      if (columnsError) throw columnsError;
       
-      // Format the data to match the expected structure for the grid
+      // Get distinct row numbers for this project
+      const { data: rowNumbers, error: rowNumbersError } = await supabase
+        .from('estimate_items')
+        .select('row_number')
+        .eq('project_id', id)
+        .order('row_number', { ascending: true });
+      
+      if (rowNumbersError) throw rowNumbersError;
+      
+      // Extract unique row numbers
+      const uniqueRowNumbers = [...new Set(rowNumbers.map(r => r.row_number))];
+      
+      // Try the new database function first
+      let structuredItems = null;
+      let itemsError = null;
+      
+      try {
+        const { data, error } = await supabase
+          .rpc('get_project_items_by_row_numbers', {
+            project_id_param: parseInt(id),
+            row_numbers: uniqueRowNumbers
+          });
+        
+        structuredItems = data;
+        itemsError = error;
+        
+        
+        if (itemsError) {
+          console.error('Database function error:', itemsError);
+          throw itemsError;
+        }
+        
+        if (!structuredItems || structuredItems.length === 0) {
+          console.warn('Database function returned empty results, falling back to EAV query');
+          throw new Error('Empty results from function');
+        }
+        
+      } catch (functionError) {
+        console.warn('Database function failed, falling back to traditional EAV query:', functionError);
+        
+        // Fallback to the old EAV method
+        const { data: estimateItems, error: eavError } = await supabase
+          .from('estimate_items')
+          .select('*')
+          .eq('project_id', id)
+          .order('row_number', { ascending: true })
+          .order('column_id', { ascending: true });
+        
+        if (eavError) throw eavError;
+        
+        const itemsByRow: Record<number, EstimateItem[]> = estimateItems.reduce<Record<number, EstimateItem[]>>((acc, item) => {
+          if (!acc[item.row_number]) {
+            acc[item.row_number] = [];
+          }
+          acc[item.row_number].push(item);
+          return acc;
+        }, {});
+
+        structuredItems = Object.entries(itemsByRow).map(([rowNumber, rowItems]) => {
+          const item: any = {};
+          rowItems.forEach((dbItem: EstimateItem) => {
+            const column = projectColumns.find((col: ColumnDefinition) => col.id === dbItem.column_id);
+            if (column) {
+              item[column.column_name] = dbItem.value;
+            }
+          });
+          
+          return {
+            row_number: parseInt(rowNumber),
+            item: item
+          };
+        });
+      }
+      
+      // Transform the structured data into LineItems with grid positions
+      const lineItems: LineItem[] = structuredItems.map((dbResult: any, index: number) => {
+        // Handle different possible response structures
+        let item, rowNumber;
+        
+        if (dbResult.get_project_items_by_row_numbers) {
+          // Structure when function returns named column
+          const dbItem = dbResult.get_project_items_by_row_numbers;
+          item = dbItem.item;
+          rowNumber = dbItem.row_number;
+        } else if (dbResult.item && typeof dbResult.row_number !== 'undefined') {
+          // Direct structure (from fallback or direct function response)
+          item = dbResult.item;
+          rowNumber = dbResult.row_number;
+        } else {
+          // Fallback - treat the result as the item itself
+          console.warn('Unexpected structure, using entire object as item:', dbResult);
+          item = dbResult;
+          rowNumber = dbResult.row_number || index + 1;
+        }
+        
+        if (!item) {
+          console.error('Item is null or undefined for dbResult:', dbResult);
+          throw new Error(`Item data is missing for row ${rowNumber}`);
+        }
+        
+        // Create line item with both grid position and row number
+        const lineItem: LineItem = {
+          id: item.parent_item_id || `row-${rowNumber}`,
+          row_number: rowNumber,
+          gridPosition: index + 1, // This is the display position (1, 2, 3...)
+          rowNumber: rowNumber,    // This is the database row_number (9, 10, 11...)
+          subItems: []
+        };
+        
+        // Dynamically map all columns from the item to the lineItem
+        for (const [columnName, value] of Object.entries(item)) {
+          if (columnName === 'parent_item_id') {
+            // Already handled above
+            continue;
+          }
+          
+          // Handle numeric columns
+          if (['quantity', 'unit_price', 'amount'].includes(columnName)) {
+            lineItem[columnName] = parseFloat(value as string) || 0;
+          } else {
+            // Handle all other columns as strings
+            lineItem[columnName] = value || '';
+          }
+        }
+        
+        return lineItem;
+      });
+
       const formattedResult = {
         estimate: {
           title: projectData.name,
           description: projectData.description,
           currency: 'USD',
-          lineItems: estimateItems.map(item => {
-            console.log('Processing item with ID:', item.id);
-            return {
-              id: item.id,
-              description: item.title,
-              quantity: item.quantity,
-              unitType: item.unit_type,
-              costType: item.cost_type || 'material',
-              unitPrice: item.unit_price,
-              amount: item.amount,
-              subItems: []
-            };
-          }),
-          totalAmount: estimateItems.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0)
+          projectColumns: projectColumns,
+          lineItems: lineItems,
+          totalAmount: lineItems.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0)
         }
       };
       
-      // Update the result
       result = formattedResult;
       prepareGridData(formattedResult);
     } catch (error) {
@@ -171,7 +315,6 @@
     }
   }
   
-  // Function to refresh the data - can be called from outside
   export function refreshData() {
     console.log('Refreshing data for project ID:', projectId);
     if (projectId) {
@@ -184,196 +327,270 @@
     gridColumns = [];
     
     if (!data.estimate || !data.estimate.lineItems) return;
+
+    const projectColumns = (data.estimate.projectColumns || []).filter(
+      column => !['parent_item_id', 'data', 'currency'].includes(column.column_name)
+    );
     
-    // Define default column settings
-    const defaultColumns: ColumnRegular[] = [
-      { 
-        prop: 'description', 
-        name: 'Description', 
-        size: 250, 
-        minSize: 200, 
-        maxSize: 500,
-        sortable: true,
-        filter: true,
-        editor: true,
-        readonly: (props) => props.model.isTotal || props.model.isSubItem
-      },
-      { 
-        prop: 'quantity', 
-        name: 'Quantity', 
-        size: 100, 
-        minSize: 80, 
-        maxSize: 150,
-        sortable: true,
-        filter: true,
-        columnType: 'numeric',
-        editor: 'number',
-        readonly: (props) => props.model.isTotal || props.model.isSubItem
-      },
-      { 
-        prop: 'unitType', 
-        name: 'Unit Type', 
-        size: 100, 
-        minSize: 80, 
-        maxSize: 150,
-        sortable: true,
-        filter: true,
-        editor: 'select',
-        editorSource: [
-          { label: 'Hour', value: 'hour' },
-          { label: 'Day', value: 'day' },
-          { label: 'Unit', value: 'unit' },
-          { label: 'Square Foot', value: 'sq-ft' },
-          { label: 'Board Foot', value: 'board-ft' },
-          { label: 'Package', value: 'package' },
-          { label: 'Linear Foot', value: 'linear-ft' }
-        ],
-        readonly: (props) => props.model.isTotal || props.model.isSubItem
-      },
-      { 
-        prop: 'costType', 
-        name: 'Cost Type', 
-        size: 100, 
-        minSize: 80, 
-        maxSize: 150,
-        sortable: true,
-        filter: true,
-        editor: 'select',
-        editorSource: [
-          { label: 'Material', value: 'material' },
-          { label: 'Labor', value: 'labor' },
-          { label: 'Equipment', value: 'equipment' },
-          { label: 'Subcontractor', value: 'subcontractor' },
-          { label: 'Other', value: 'other' }
-        ],
-        readonly: (props) => props.model.isTotal || props.model.isSubItem
-      },
-      { 
-        prop: 'unitPrice', 
-        name: 'Unit Price', 
-        size: 120, 
-        minSize: 100, 
-        maxSize: 200,
-        sortable: true,
-        filter: true,
-        columnType: 'numeric',
-        editor: 'number',
-        readonly: (props) => props.model.isTotal || props.model.isSubItem
-      },
-      { 
-        prop: 'amount', 
-        name: 'Amount', 
-        size: 120, 
-        minSize: 100, 
-        maxSize: 200,
-        sortable: true,
-        filter: true,
-        columnType: 'numeric',
-        readonly: true
-      },
-      {
-        prop: 'actions',
-        name: 'Actions',
-        size: 100,
+    const dynamicColumns: ColumnRegular[] = projectColumns.map(column => {
+      const displayName = column.column_name
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+      
+      const currentColumnName = column.column_name;
+      const currentColumn = column;
+      
+      const baseColumn: ColumnRegular = {
+        prop: column.column_name,
+        name: displayName,
+        size: column.size || 150,
         minSize: 80,
-        maxSize: 120,
-        cellTemplate: (h, props) => {
-          // Don't show delete button for total row
-          if (props.model.isTotal) {
-            return h('div', {}, '');
-          }
-          return h(
-            'button',
-            {
+        maxSize: 300,
+        sortable: true,
+        filter: true,
+        readonly: (props) => props.model.isTotal || props.model.isSubItem || column.is_readonly,
+        columnTemplate: (h, props) => {
+          return h('div', {
+            'data-column-name': currentColumnName,
+            'key': `column-header-${currentColumnName}`,
+            style: {
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              width: '100%',
+              padding: '4px 8px',
+              userSelect: 'none',
+              position: 'relative'
+            }
+          }, [
+            h('div', {
               style: {
-                background: 'none',
-                border: 'none',
-                color: 'red',
-                cursor: 'pointer',
-                padding: '4px 8px',
-                borderRadius: '4px',
-                fontSize: '12px'
-              },
-              onClick: () => {
-                handleDeleteItem(props.model);
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                flex: '1'
               }
-            },
-            'Delete'
-          );
+            }, [
+              h('span', {
+                style: {
+                  fontWeight: '500'
+                }
+              }, displayName)
+            ]),
+            h('div', {
+              style: {
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }
+            }, [
+              h('button', {
+                style: {
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '2px',
+                  borderRadius: '3px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--neutral-400)',
+                  fontSize: '12px',
+                  width: '20px',
+                  height: '20px'
+                },
+                onClick: (e) => {
+                  e.stopPropagation();
+                  handleEditColumn(currentColumn);
+                },
+                onMouseEnter: (e) => {
+                  e.target.style.backgroundColor = 'var(--neutral-50)';
+                  e.target.style.color = 'var(--neutral-600)';
+                },
+                onMouseLeave: (e) => {
+                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.color = 'var(--neutral-400)';
+                },
+                title: 'Edit column'
+              }, '⚙'),
+              h('button', {
+                style: {
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '2px',
+                  borderRadius: '3px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--neutral-400)',
+                  fontSize: '12px',
+                  width: '20px',
+                  height: '20px'
+                },
+                onClick: (e) => {
+                  e.stopPropagation();
+                  handleDeleteColumn(currentColumn);
+                },
+                onMouseEnter: (e) => {
+                  e.target.style.backgroundColor = 'var(--accent-light)';
+                  e.target.style.color = 'var(--action-danger)';
+                },
+                onMouseLeave: (e) => {
+                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.color = 'var(--neutral-400)';
+                },
+                title: 'Delete column'
+              }, '×')
+            ])
+          ]);
         }
-      },
-    ];
-    
-    // Apply saved column widths if available, otherwise use defaults
+      };
+
+      switch (column.data_type) {
+        case 'number':
+        case 'integer':
+        case 'float':
+          return {
+            ...baseColumn,
+            columnType: 'numeric',
+            size: 120,
+            minSize: 80,
+            maxSize: 150
+          };
+        
+        case 'select':
+        case 'dropdown':
+          return {
+            ...baseColumn,
+            size: 150
+          };
+        
+        case 'boolean':
+          return {
+            ...baseColumn,
+            size: 100
+          };
+        
+        case 'date':
+          return {
+            ...baseColumn,
+            columnType: 'date',
+            size: 120
+          };
+        
+        case 'text':
+        default:
+          return {
+            ...baseColumn,
+            size: column.column_name === 'description' ? 250 : 150
+          };
+      }
+    });
+
+    const actionsColumn: ColumnRegular = {
+      prop: 'actions',
+      name: 'Actions',
+      size: 100,
+      minSize: 80,
+      maxSize: 120,
+      cellTemplate: (h, props) => {
+        if (props.model.isTotal) {
+          return h('div', {});
+        }
+        return h(
+          'button',
+          {
+            style: {
+              background: 'none',
+              border: 'none',
+              color: 'var(--action-danger)',
+              cursor: 'pointer',
+              padding: '4px 8px',
+              borderRadius: '4px',
+              fontSize: '12px'
+            },
+            onClick: () => {
+              handleDeleteItem(props.model);
+            }
+          },
+          'Delete'
+        );
+      }
+    };
+    // Combine dynamic columns with the actions column
+    const defaultColumns = [...dynamicColumns, actionsColumn];
     gridColumns = applySavedColumnWidths(defaultColumns);
-    
     const flattenedItems = [];
-    
+    const columnNames = (data.estimate.projectColumns || []).map(col => col.column_name);
     data.estimate.lineItems.forEach((item, index) => {
-      flattenedItems.push({
-        id: item.id, // Use the actual database ID directly
-        description: item.description,
-        quantity: item.quantity,
-        unitType: item.unitType,
-        costType: item.costType || 'material',
-        unitPrice: item.unitPrice,
-        amount: item.amount,
-        isHeader: true
+      const rowItem = { 
+        id: item.id,
+        isHeader: true,
+        gridPosition: item.gridPosition || (index + 1), // Ensure we have gridPosition
+        rowNumber: item.rowNumber || item.row_number,   // Ensure we have rowNumber
+        ...item 
+      };
+      
+      columnNames.forEach(colName => {
+        if (rowItem[colName] === undefined) {
+          rowItem[colName] = null;
+        }
       });
+      
+      flattenedItems.push(rowItem);
       
       if (item.subItems && item.subItems.length > 0) {
         item.subItems.forEach((subItem, subIndex) => {
-          flattenedItems.push({
+          const subRowItem = {
             id: `item-${index}-sub-${subIndex}`,
-            description: `    ${subItem.description}`,
-            quantity: subItem.quantity,
-            unitType: subItem.unitType,
-            unitPrice: subItem.unitPrice,
-            amount: subItem.amount,
+            ...subItem,
             isSubItem: true
-          });
+          };
+          
+          if (subItem.description !== undefined) {
+            subRowItem.description = `    ${subItem.description}`;
+          }
+          
+          flattenedItems.push(subRowItem);
         });
       }
     });
     
-    flattenedItems.push({
+    const totalRow = {
       id: 'total',
       description: 'Total',
       amount: data.estimate.totalAmount,
       isTotal: true
+    };
+    
+    columnNames.forEach(colName => {
+      if (colName !== 'description' && colName !== 'amount') {
+        totalRow[colName] = '';
+      }
     });
     
+    flattenedItems.push(totalRow);
     gridSource = flattenedItems;
   }
   
-  // Save column widths to local storage
   function saveColumnWidths(columnDetails: {[index: number]: {prop: string, size: number}}) {
     try {
       const widthsToSave: {[prop: string]: number} = {};
-      
-      // Extract column widths from the resized columns
       Object.entries(columnDetails).forEach(([index, column]) => {
         widthsToSave[column.prop] = column.size;
       });
-      
-      // Get existing saved widths or initialize empty object
       const existingWidths = JSON.parse(localStorage.getItem(COLUMN_WIDTHS_KEY) || '{}');
-      
-      // Merge new widths with existing ones
       const updatedWidths = { ...existingWidths, ...widthsToSave };
-      
-      // Save to local storage
       localStorage.setItem(COLUMN_WIDTHS_KEY, JSON.stringify(updatedWidths));
     } catch (error) {
       console.error('Error saving column widths to local storage:', error);
     }
   }
   
-  // Load column widths from local storage
   function loadColumnWidths() {
     try {
-      // This just loads the data from localStorage
-      // Actual application happens in applySavedColumnWidths
       return JSON.parse(localStorage.getItem(COLUMN_WIDTHS_KEY) || '{}');
     } catch (error) {
       console.error('Error loading column widths from local storage:', error);
@@ -381,11 +598,8 @@
     }
   }
   
-  // Apply saved column widths to the default column settings
   function applySavedColumnWidths(defaultColumns: ColumnRegular[]) {
     const savedWidths = loadColumnWidths();
-    
-    // Return a new array with potentially updated sizes
     return defaultColumns.map(column => {
       if (savedWidths[column.prop]) {
         return { ...column, size: savedWidths[column.prop] };
@@ -394,13 +608,11 @@
     });
   }
   
-  // Calculate amount based on quantity and unit price
   function calculateAmount() {
     newItem.amount = newItem.quantity * newItem.unitPrice;
     newItem.amount = parseFloat(newItem.amount.toFixed(2));
   }
   
-  // Handle adding a new item
   async function addNewItem() {
     if (!newItem.description || newItem.quantity <= 0 || newItem.unitPrice <= 0) {
       alert('Please fill in all required fields');
@@ -410,227 +622,218 @@
     calculateAmount();
     
     try {
-      // Get the project ID directly from the URL parameters
-      const hash = window.location.hash;
-      const queryString = hash.split('?')[1];
-      const params = new URLSearchParams(queryString || '');
-      const projectId = params.get('id') ? parseInt(params.get('id')) : null;
-      
-      if (!projectId) {
+      const currentProjectId = result?.estimate?.project?.id || projectId;
+      if (!currentProjectId) {
         alert('Project ID not found');
         return;
       }
       
-      // Prepare the data to send to Supabase
-      const itemData = {
-        project_id: projectId,
-        title: newItem.description,
-        description: newItem.description,
-        quantity: newItem.quantity,
-        unit_price: newItem.unitPrice,
-        unit_type: newItem.unitType, // This will use the selected unit type from the dropdown
-        cost_type: newItem.costType,
-        amount: newItem.amount,
-        currency: result.estimate?.currency || 'USD',
-        total_amount: newItem.amount,
-        status: 'draft',
-        is_sub_item: false,
-        created_by: $user?.id,
-        data: {
-          tags: [],
-          notes: '',
-          ai_generated: false
-        }
+      const projectColumns = result?.estimate?.projectColumns || [];
+      
+      const existingItems = result?.estimate?.lineItems || [];
+      const maxRowNumber = existingItems.reduce((max, item) => {
+        return Math.max(max, item.row_number || 0);
+      }, 0);
+      const newRowNumber = maxRowNumber + 1;
+      
+      const insertPromises = [];
+      
+      const fieldMappings = {
+        'description': newItem.description,
+        'title': newItem.description, // Support both column names
+        'quantity': newItem.quantity.toString(),
+        'unit_type': newItem.unitType,
+        'unit_price': newItem.unitPrice.toString(),
+        'amount': newItem.amount.toString(),
+        'cost_type': newItem.costType,
+        'currency': result.estimate?.currency || 'USD',
+        'status': 'draft'
       };
       
-      console.log('Adding new item with unit type:', newItem.unitType);
-      
-      // Add the item using Supabase
-      const { data: savedItem, error } = await supabase
-        .from('estimate_items')
-        .insert(itemData)
-        .select()
-        .single();
-      
-      if (error) {
-        throw error;
+      // Insert a value for each column that has data
+      for (const [columnName, value] of Object.entries(fieldMappings)) {
+        const column = projectColumns.find(col => col.column_name === columnName);
+        if (column && value) {
+          insertPromises.push(
+            supabase
+              .from('estimate_items')
+              .insert({
+                project_id: currentProjectId,
+                row_number: newRowNumber,
+                column_id: column.id,
+                value: value
+              })
+          );
+        }
       }
       
-      // Dispatch an event to notify parent components that a new item was added
-      dispatch('itemAdded', savedItem);
+      // Execute all inserts
+      const results = await Promise.all(insertPromises);
       
-      // Reset the form but keep the last used unit type and cost type for convenience
+      // Check for errors
+      const errors = results.filter(result => result.error);
+      if (errors.length > 0) {
+        throw errors[0].error;
+      }
+      
+      dispatch('itemAdded');
+      toast.success('Item added successfully');
+      
       const lastUnitType = newItem.unitType;
       const lastCostType = newItem.costType;
       newItem = {
         description: '',
         quantity: 1,
-        unitType: lastUnitType, // Keep the last selected unit type
-        costType: lastCostType, // Keep the last selected cost type
+        unitType: lastUnitType,
+        costType: lastCostType,
         unitPrice: 0,
         amount: 0
       };
-      
-      // Hide the form
       showNewItemForm = false;
       
     } catch (error) {
       console.error('Error adding new item:', error);
-      alert('Failed to add new item. Please try again.');
+      toast.error('Failed to add new item. Please try again.');
     }
   }
   
-  // Toggle the new item form
   function toggleNewItemForm() {
     showNewItemForm = !showNewItemForm;
     
-    // If we're showing the form, recalculate the amount to ensure it's correct
     if (showNewItemForm) {
       calculateAmount();
     }
   }
   
-  // Handle deleting an item
   async function handleDeleteItem(item) {
-    if (!item || !item.id) {
-      console.error('No item ID found for deletion');
+    if (!item || !item.row_number) {
+      console.error('No row_number found for deletion');
+      return;
+    }
+    
+    const currentProjectId = result?.estimate?.project?.id || projectId;
+    if (!currentProjectId) {
+      console.error('No project ID found');
       return;
     }
     
     if (confirm(`Are you sure you want to delete ${item.description || 'this item'}?`)) {
       try {
+        // Delete all cells for this row_number in the EAV structure
         const { error } = await supabase
           .from('estimate_items')
           .delete()
-          .eq('id', item.id);
+          .eq('project_id', currentProjectId)
+          .eq('row_number', item.row_number);
         
         if (error) throw error;
         
-        // Refresh the data
-        dispatch('refresh');
-        alert('Item deleted successfully');
+        dispatch('itemDeleted');
+        toast.success('Item deleted successfully');
       } catch (error) {
         console.error('Error deleting item:', error);
-        alert('Failed to delete item. Please try again.');
+        toast.error('Failed to delete item. Please try again.');
       }
     }
   }
 
-  // Handle cell edit event
   async function handleCellEdit(editEvent) {
     try {
       console.log(`handleCellEdit: ${JSON.stringify(editEvent)}`);
       
-      // Extract the edited cell data - RevoGrid uses a different structure
       const { prop, model, val, value: oldVal, rowIndex } = editEvent;
       
       console.log('Cell edit event processed:', { prop, model, val, oldVal, rowIndex });
       
-      // Skip if value hasn't changed
-      if (val === oldVal) return;
+      if (val === oldVal || model?.isTotal) return;
       
-      // The model contains the row data directly
       const rowData = model;
       console.log('Row data from model:', rowData);
       
       if (!rowData || rowData.isTotal) return;
       
-      // Get the item ID directly from the model
-      let itemId = rowData.id;
-      console.log('Item ID from model:', itemId);
-      
-      // If the ID is not a number, try to extract it from the string format
-      if (typeof itemId === 'string' && itemId.startsWith('item-')) {
-        const parts = itemId.split('-');
-        if (parts.length > 1 && !isNaN(Number(parts[1]))) {
-          itemId = Number(parts[1]);
-        }
-      }
-      
-      console.log('Final itemId for database update:', itemId);
-      
-      // If we still don't have a valid ID, we can't update the database
-      if (!itemId) {
-        console.error('No valid item ID found for database update');
-        toast.error('Could not update: No valid item ID');
+      // Get row_number from the model
+      const rowNumber = rowData.row_number;
+      if (!rowNumber) {
+        console.error('No row_number found in row data');
+        toast.error('Could not update: No row number found');
         return;
       }
       
-      // Calculate new amount if quantity or unitPrice changed
-      let newAmount = rowData.amount;
-      if (prop === 'quantity' || prop === 'unitPrice') {
-        // Parse values to ensure they're numbers
-        const quantity = prop === 'quantity' ? parseFloat(val) : parseFloat(rowData.quantity);
-        const unitPrice = prop === 'unitPrice' ? parseFloat(val) : parseFloat(rowData.unitPrice);
+      // Get column definition
+      const projectColumns = result?.estimate?.projectColumns || [];
+      const column = projectColumns.find(col => col.column_name === prop);
+      
+      if (!column) {
+        console.error('Column not found:', prop);
+        toast.error(`Column ${prop} not found`);
+        return;
+      }
+      
+      const currentProjectId = result?.estimate?.project?.id || projectId;
+      let processedValue = val;
+      
+      // Handle amount calculation for quantity or unit_price changes
+      if (prop === 'quantity' || prop === 'unit_price') {
+        const quantity = prop === 'quantity' ? parseFloat(processedValue) : parseFloat(rowData.quantity || 0);
+        const unitPrice = prop === 'unit_price' ? parseFloat(processedValue) : parseFloat(rowData.unit_price || 0);
+        const newAmount = quantity * unitPrice;
         
-        // Update the local data
-        if (prop === 'quantity') {
-          rowData.quantity = quantity;
-        } else if (prop === 'unitPrice') {
-          rowData.unitPrice = unitPrice;
-        }
-        
-        // Recalculate amount
-        newAmount = quantity * unitPrice;
+        // Update the amount in the grid data
         rowData.amount = newAmount;
         
-        console.log('Recalculated amount:', newAmount);
-        
-        // Update the grid source to reflect the new amount
-        // We need to update the specific row in the data array
         if (editEvent.data && Array.isArray(editEvent.data)) {
-          // Find the index of the row in the data array
-          const dataIndex = editEvent.data.findIndex(item => item.id === itemId);
+          const dataIndex = editEvent.data.findIndex(item => item.row_number === rowNumber);
           if (dataIndex >= 0) {
             editEvent.data[dataIndex].amount = newAmount;
-            // Update the grid source
             gridSource = [...editEvent.data];
           }
-        } else {
-          // Fallback to refreshing all data
-          refreshData();
         }
         
-        // Also need to update the total row
+        // Find the amount column
+        const amountColumn = projectColumns.find(col => col.column_name === 'amount');
+        if (amountColumn) {
+          // Update amount in database
+          const { error: amountError } = await supabase
+            .from('estimate_items')
+            .upsert({
+              project_id: currentProjectId,
+              row_number: rowNumber,
+              column_id: amountColumn.id,
+              value: newAmount.toString(),
+              updated_at: new Date().toISOString()
+            }, {
+              onConflict: 'project_id,row_number,column_id'
+            });
+          
+          if (amountError) {
+            console.error('Error updating amount:', amountError);
+          }
+        }
+        
         updateTotalAmount();
       }
       
-      // Map grid property names to database column names
-      const propToColumnMap = {
-        'description': 'title',
-        'quantity': 'quantity',
-        'unitType': 'unit_type',
-        'costType': 'cost_type',
-        'unitPrice': 'unit_price',
-        'amount': 'amount'
-      };
-      
-      // Prepare data for database update
-      const updateData: Record<string, any> = {};
-      
-      // Handle different data types appropriately
-      if (prop === 'quantity' || prop === 'unitPrice') {
-        // Make sure we're sending a number to the database
-        const numValue = typeof val === 'string' ? parseFloat(val) : val;
-        updateData[propToColumnMap[prop]] = isNaN(numValue) ? 0 : numValue;
-      } else {
-        updateData[propToColumnMap[prop] || prop] = val;
-      }
-      
-      // If amount was recalculated, update that too
-      if (prop === 'quantity' || prop === 'unitPrice') {
-        updateData.amount = newAmount;
-        updateData.total_amount = newAmount; // Update total_amount field too
-      }
-      
-      console.log('Sending update to database:', { itemId, updateData });
+      console.log('Updating value in EAV structure:', { 
+        projectId: currentProjectId, 
+        rowNumber, 
+        columnId: column.id, 
+        value: processedValue 
+      });
       
       try {
-        // Update the database
+        // Update the specific cell value in the EAV structure
         const { data, error } = await supabase
           .from('estimate_items')
-          .update(updateData)
-          .eq('id', itemId)
+          .upsert({
+            project_id: projectId,
+            row_number: rowNumber,
+            column_id: column.id,
+            value: processedValue.toString(),
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'project_id,row_number,column_id'
+          })
           .select();
         
         if (error) {
@@ -639,190 +842,199 @@
         }
         
         console.log('Database update successful:', data);
-        
-        // Show success toast
         toast.success('Item updated successfully');
         
-        // Refresh the data to ensure UI is in sync with database
-        // Use a short timeout to allow the UI to update first
         setTimeout(() => {
           refreshData();
         }, 100);
+        
       } catch (dbError) {
         console.error('Database update failed:', dbError);
         toast.error(`Database update failed: ${dbError.message || 'Unknown error'}`);
-        // Refresh to ensure UI is in sync with database
         refreshData();
       }
       
     } catch (error) {
       console.error('Error updating item:', error);
-      toast.error('Failed to update item: ' + error.message);
-      
-      // Refresh data to revert changes in UI
+      toast.error('Failed to update item: ' + (error.message || 'Unknown error'));
       refreshData();
     }
   }
   
-  // Update the total amount in the grid
   function updateTotalAmount() {
-    // Calculate new total
     const newTotal = gridSource
       .filter(item => !item.isTotal && !item.isSubItem)
       .reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
     
-    // Update the total row
     const totalRow = gridSource.find(row => row.isTotal);
     if (totalRow) {
       totalRow.amount = newTotal;
     }
     
-    // Update the result object
     if (result && result.estimate) {
       result.estimate.totalAmount = newTotal;
     }
   }
-
-  function exportToExcel() {
-    if (!gridSource || gridSource.length === 0) {
-      alert('No data to export');
+  
+  // Column management functions
+  function handleAddColumn() {
+    columnDialogMode = 'add';
+    editingColumn = null;
+    newColumn = {
+      column_name: '',
+      data_type: 'text',
+      is_required: false,
+      position: 0
+    };
+    showColumnDialog = true;
+  }
+  
+  function handleEditColumn(column) {
+    columnDialogMode = 'edit';
+    editingColumn = column;
+    newColumn = {
+      column_name: column.column_name,
+      data_type: column.data_type,
+      is_required: column.is_required,
+      position: column.position
+    };
+    showColumnDialog = true;
+  }
+  
+  async function handleDeleteColumn(column) {
+    if (!column || !projectId) return;
+    
+    if (confirm(`Are you sure you want to delete the "${column.column_name}" column? This will delete all data in this column.`)) {
+      try {
+        // First delete all estimate_items for this column
+        const { error: itemsError } = await supabase
+          .from('estimate_items')
+          .delete()
+          .eq('project_id', projectId)
+          .eq('column_id', column.id);
+        
+        if (itemsError) throw itemsError;
+        
+        // Then delete the column definition
+        const { error: columnError } = await supabase
+          .from('estimate_columns')
+          .delete()
+          .eq('id', column.id);
+        
+        if (columnError) throw columnError;
+        
+        toast.success('Column deleted successfully');
+        refreshData();
+      } catch (error) {
+        console.error('Error deleting column:', error);
+        toast.error('Failed to delete column: ' + error.message);
+      }
+    }
+  }
+  
+  async function saveColumn() {
+    if (!newColumn.column_name.trim() || !projectId) {
+      toast.error('Column name is required');
       return;
     }
-
+    
     try {
-      // Prepare data for export - filter out any special rows or formatting
-      const exportData = gridSource.map(row => {
-        // Create a clean object for each row, excluding any special properties
-        const cleanRow = {};
+      const projectColumns = result?.estimate?.projectColumns || [];
+      const maxPosition = Math.max(...projectColumns.map(col => col.position || 0), 0);
+      
+      if (columnDialogMode === 'add') {
+        // Check if column name already exists
+        const existingColumn = projectColumns.find(col => 
+          col.column_name.toLowerCase() === newColumn.column_name.toLowerCase()
+        );
         
-        // Add data from each column
-        gridColumns.forEach(col => {
-          if (col.prop && typeof row[col.prop] !== 'undefined') {
-            cleanRow[col.name || col.prop] = row[col.prop];
-          }
-        });
+        if (existingColumn) {
+          toast.error('Column name already exists');
+          return;
+        }
         
-        return cleanRow;
-      });
-
-      // Create a worksheet from the data
-      const worksheet = XLSX.utils.json_to_sheet(exportData);
+        // Insert new column
+        const { error } = await supabase
+          .from('estimate_columns')
+          .insert({
+            project_id: projectId,
+            column_name: newColumn.column_name.toLowerCase().replace(/\s+/g, '_'),
+            data_type: newColumn.data_type,
+            is_required: newColumn.is_required,
+            position: maxPosition + 1
+          });
+        
+        if (error) throw error;
+        toast.success('Column added successfully');
+      } else if (columnDialogMode === 'edit' && editingColumn) {
+        // Update existing column
+        const { error } = await supabase
+          .from('estimate_columns')
+          .update({
+            column_name: newColumn.column_name.toLowerCase().replace(/\s+/g, '_'),
+            data_type: newColumn.data_type,
+            is_required: newColumn.is_required
+          })
+          .eq('id', editingColumn.id);
+        
+        if (error) throw error;
+        toast.success('Column updated successfully');
+      }
       
-      // Create a workbook and add the worksheet
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Estimate');
-      
-      // Generate filename based on estimate title
-      const filename = `${result.estimate?.title || 'Project_Estimate'}.xlsx`;
-      
-      // Export the workbook
-      XLSX.writeFile(workbook, filename);
+      showColumnDialog = false;
+      refreshData();
     } catch (error) {
-      console.error('Error exporting to Excel:', error);
-      alert('Failed to export data. Please try again.');
+      console.error('Error saving column:', error);
+      toast.error('Failed to save column: ' + error.message);
     }
   }
+  
+  async function handleMouseUp() {
+    setTimeout(async () => {
+      if (revoGridInstance) {
+        try {
+          const selection = await revoGridInstance.getSelectedRange();
+          if (selection && typeof selection.y === 'number' && typeof selection.y1 === 'number') {
+            const startRow = selection.y + 1;
+            const endRow = selection.y1 + 1;
+            const rangeRef = startRow === endRow ? `@${startRow}` : `@${startRow}-${endRow}`;
+            currentSelection = selection;
+            rangeReference = rangeRef;
+          } else {
+            currentSelection = null;
+            rangeReference = null;
+          }
+        } catch (error) {
+          console.error('Error getting selected range:', error);
+          currentSelection = null;
+          rangeReference = null;
+        }
+      } else {
+        console.log('revoGridInstance is null');
+      }
+    }, 100);
+  }
+  
+  function sendRangeToAI() {
+    if (rangeReference) {
+      selectedRangeStore.set(rangeReference);
+      window.dispatchEvent(new CustomEvent('openAiSidebar', {
+        detail: { 
+          projectId: projectId,
+          projectName: result?.estimate?.title || 'Project'
+        }
+      }));
+      currentSelection = null;
+      rangeReference = null;
+    }
+  }
+  
 </script>
 
-<style>
-  /* Fix for invisible text in editable cells */
-  :global(.revogr-edit) {
-    color: #000 !important;
-    background-color: #fff !important;
-    border: 1px solid #4299e1 !important;
-    padding: 4px !important;
-  }
-  
-  :global(.revogr-focus) {
-    border: 1px solid #4299e1 !important;
-  }
-  
-  :global(.revo-dropdown-list) {
-    color: #000 !important;
-    background-color: #fff !important;
-    max-height: 200px !important;
-    overflow-y: auto !important;
-    z-index: 1000 !important;
-  }
-  
-  /* Make grid container take up available vertical space */
-  .grid-container {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    height: auto;
-  }
-  
-  /* Responsive grid height */
-  @media (max-width: 640px) {
-    .grid-container {
-      height: 500px;
-      min-height: 300px;
-      max-height: 70vh;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
-    }
-    
-    /* Improve mobile grid behavior */
-    :global(.grid-container > .revogr-holder) {
-      overflow: visible !important;
-      touch-action: manipulation; /* Improve touch handling */
-    }
-    
-    /* Prevent focus loss on touch */
-    :global(.revogr-focus) {
-      outline: 2px solid #4299e1 !important;
-      outline-offset: -2px;
-      z-index: 5 !important;
-    }
-    
-    /* Improve touch targets for better usability */
-    :global(.revogr-cell) {
-      min-height: 44px !important; /* Minimum touch target size */
-    }
-  }
-  
-  @media (min-width: 641px) {
-    .grid-container {
-      height: 700px; /* Fixed height to enable scrolling */
-      min-height: 600px;
-      max-height: 90vh; /* Limit maximum height */
-      overflow-y: auto; /* Enable vertical scrolling */
-      padding-bottom: 50px; /* Add some padding at the bottom */
-    }
-  }
-  
-  /* Ensure RevoGrid takes full height of its container */
-  :global(.grid-container > .revogr-holder) {
-    flex: 1;
-    height: 100% !important;
-    position: relative;
-  }
-  
-  /* Fix horizontal scrollbar position */
-  :global(.revogr-horizontal-scrollable) {
-    position: sticky !important;
-    bottom: 0 !important;
-    z-index: 10 !important;
-    background-color: white;
-  }
-  
-  /* Mobile horizontal scrollbar adjustments */
-  @media (max-width: 640px) {
-    :global(.revogr-horizontal-scrollable) {
-      position: relative !important;
-      bottom: auto !important;
-    }
-  }
-  
-  :global(.revo-dropdown-list .selected) {
-    background-color: #4299e1 !important;
-    color: white !important;
-  }
-</style>
 
 {#if gridSource.length > 0}
-  <div class="bg-white rounded-md shadow mb-4 flex flex-col">
+  <div class="flex flex-col">
+    <div class="rounded-md shadow mb-4 flex flex-col flex-shrink-0">
     <div class="p-3 sm:p-4 bg-slate-50 rounded-t-md border-b">
       <!-- Desktop layout - Optimized for better space utilization -->
       <div class="hidden sm:flex items-center justify-between gap-4 w-full">
@@ -836,9 +1048,24 @@
           </div>
         </div>
         <div class="flex items-center gap-2 shrink-0">
+          {#if rangeReference}
+            <button 
+              on:click={sendRangeToAI}
+              class="bg-action-primary hover:bg-accent-hover active:bg-accent-hover text-white px-3 py-2 rounded-md text-sm font-medium flex items-center justify-center shadow-sm transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              <span class="whitespace-nowrap">Send {rangeReference} to AI</span>
+            </button>
+          {/if}
           <button 
-            on:click={exportToExcel} 
-            class="bg-green-500 hover:bg-green-600 active:bg-green-700 text-white px-3 py-2 rounded-md text-sm font-medium flex items-center justify-center shadow-sm transition-colors"
+            on:click={() => exportToExcel(
+        gridSource,
+        gridColumns,
+        result.estimate?.title
+      )} 
+            class="bg-action-success hover:bg-green-600 active:bg-green-700 text-white px-3 py-2 rounded-md text-sm font-medium flex items-center justify-center shadow-sm transition-colors"
           >
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -846,8 +1073,18 @@
             <span class="whitespace-nowrap">Export</span>
           </button>
           <button 
+            on:click={handleAddColumn} 
+            class="bg-action-secondary hover:bg-neutral-600 active:bg-neutral-600 text-white px-3 py-2 rounded-md text-sm font-medium flex items-center justify-center shadow-sm transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V9l-6-5z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 4v5h5" />
+            </svg>
+            <span class="whitespace-nowrap">Add Column</span>
+          </button>
+          <button 
             on:click={toggleNewItemForm} 
-            class="bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white px-3 py-2 rounded-md text-sm font-medium flex items-center justify-center shadow-sm transition-colors"
+            class="bg-action-primary hover:bg-accent-hover active:bg-accent-hover text-white px-3 py-2 rounded-md text-sm font-medium flex items-center justify-center shadow-sm transition-colors"
           >
             {#if !showNewItemForm}
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -858,7 +1095,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
               </svg>
             {/if}
-            <span class="whitespace-nowrap">{showNewItemForm ? 'Cancel' : 'Add'}</span>
+            <span class="whitespace-nowrap">{showNewItemForm ? 'Cancel' : 'Add Item'}</span>
           </button>
         </div>
       </div>
@@ -874,9 +1111,24 @@
             </div>
           </div>
           <div class="flex gap-1">
+            {#if rangeReference}
+              <button 
+                on:click={sendRangeToAI}
+                class="bg-action-primary hover:bg-accent-hover active:bg-accent-hover text-white p-1.5 rounded-md flex items-center justify-center shadow-sm"
+                aria-label="Send {rangeReference} to AI"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+              </button>
+            {/if}
             <button 
-              on:click={exportToExcel} 
-              class="bg-green-500 hover:bg-green-600 active:bg-green-700 text-white p-1.5 rounded-md flex items-center justify-center shadow-sm"
+              on:click={() => exportToExcel(
+        gridSource,
+        gridColumns,
+        result.estimate?.title
+      )} 
+              class="bg-action-success hover:bg-green-600 active:bg-green-700 text-white p-1.5 rounded-md flex items-center justify-center shadow-sm"
               aria-label="Export as Excel"
             >
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -884,8 +1136,18 @@
               </svg>
             </button>
             <button 
+              on:click={handleAddColumn} 
+              class="bg-action-secondary hover:bg-neutral-600 active:bg-neutral-600 text-white p-1.5 rounded-md flex items-center justify-center shadow-sm"
+              aria-label="Add new column"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V9l-6-5z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 4v5h5" />
+              </svg>
+            </button>
+            <button 
               on:click={toggleNewItemForm} 
-              class="bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white p-1.5 rounded-md flex items-center justify-center shadow-sm"
+              class="bg-action-primary hover:bg-accent-hover active:bg-accent-hover text-white p-1.5 rounded-md flex items-center justify-center shadow-sm"
               aria-label="{showNewItemForm ? 'Cancel' : 'Add new item'}"
             >
               {#if !showNewItemForm}
@@ -908,17 +1170,17 @@
           <h5 class="font-medium mb-3">Add New Estimate Item</h5>
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <div class="col-span-1 md:col-span-2">
-              <label for="item-description" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+              <label for="item-description" class="block text-sm font-medium text-neutral-600 mb-1">Description</label>
               <input 
                 id="item-description"
                 type="text" 
                 bind:value={newItem.description} 
-                class="w-full p-2 border border-gray-300 rounded-md"
+                class="w-full p-2 border border-neutral-200 rounded-md"
                 placeholder="Item description"
               />
             </div>
             <div>
-              <label for="item-quantity" class="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+              <label for="item-quantity" class="block text-sm font-medium text-neutral-600 mb-1">Quantity</label>
               <input 
                 id="item-quantity"
                 type="number" 
@@ -926,15 +1188,15 @@
                 min="0.01" 
                 step="0.01"
                 on:input={calculateAmount}
-                class="w-full p-2 border border-gray-300 rounded-md"
+                class="w-full p-2 border border-neutral-200 rounded-md"
               />
             </div>
             <div>
-              <label for="item-unit-type" class="block text-sm font-medium text-gray-700 mb-1">Unit Type</label>
+              <label for="item-unit-type" class="block text-sm font-medium text-neutral-600 mb-1">Unit Type</label>
               <select 
                 id="item-unit-type"
                 bind:value={newItem.unitType} 
-                class="w-full p-2 border border-gray-300 rounded-md"
+                class="w-full p-2 border border-neutral-200 rounded-md"
               >
                 <option value="hour">Hour</option>
                 <option value="day">Day</option>
@@ -946,11 +1208,11 @@
               </select>
             </div>
             <div>
-              <label for="item-cost-type" class="block text-sm font-medium text-gray-700 mb-1">Cost Type</label>
+              <label for="item-cost-type" class="block text-sm font-medium text-neutral-600 mb-1">Cost Type</label>
               <select 
                 id="item-cost-type"
                 bind:value={newItem.costType} 
-                class="w-full p-2 border border-gray-300 rounded-md"
+                class="w-full p-2 border border-neutral-200 rounded-md"
               >
                 <option value="material">Material</option>
                 <option value="labor">Labor</option>
@@ -960,7 +1222,7 @@
               </select>
             </div>
             <div>
-              <label for="item-unit-price" class="block text-sm font-medium text-gray-700 mb-1">Unit Price</label>
+              <label for="item-unit-price" class="block text-sm font-medium text-neutral-600 mb-1">Unit Price</label>
               <input 
                 id="item-unit-price"
                 type="number" 
@@ -968,7 +1230,7 @@
                 min="0.01" 
                 step="0.01"
                 on:input={calculateAmount}
-                class="w-full p-2 border border-gray-300 rounded-md"
+                class="w-full p-2 border border-neutral-200 rounded-md"
               />
             </div>
           </div>
@@ -979,7 +1241,7 @@
             </div>
             <button 
               on:click={addNewItem} 
-              class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md text-sm"
+              class="bg-action-success hover:bg-green-600 text-white px-4 py-2 rounded-md text-sm"
             >
               Save Item
             </button>
@@ -988,8 +1250,9 @@
       {/if}
     </div>
   </div>
-  <div class="grid-container flex-1 bg-white rounded-md overflow-hidden mobile-grid-container">
+  <div class="flex h-[calc(90dvh-100px)] rounded-md overflow-hidden relative" bind:this={gridContainer} on:mouseup={handleMouseUp} role="grid" tabindex="0">
     <RevoGrid
+      bind:this={revoGridInstance}
       source={gridSource} 
       columns={gridColumns}
       theme="material"
@@ -1025,8 +1288,83 @@
       }}
     />
   </div>
+  </div>
 {:else}
   <div class="bg-slate-50 p-4 rounded-md">
     <pre class="whitespace-pre-wrap text-sm">{JSON.stringify(result, null, 2)}</pre>
+  </div>
+{/if}
+
+<!-- Column Management Dialog -->
+{#if showColumnDialog}
+  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full">
+      <div class="p-6">
+        <h3 class="text-lg font-semibold mb-4">
+          {columnDialogMode === 'add' ? 'Add New Column' : 'Edit Column'}
+        </h3>
+        
+        <div class="space-y-4">
+          <div>
+            <label for="column-name" class="block text-sm font-medium text-neutral-600 mb-1">
+              Column Name
+            </label>
+            <input
+              id="column-name"
+              type="text"
+              bind:value={newColumn.column_name}
+              placeholder="Enter column name"
+              class="w-full p-2 border border-neutral-200 rounded-md focus:ring-2 focus:ring-action-primary focus:border-action-primary"
+            />
+          </div>
+          
+          <div>
+            <label for="data-type" class="block text-sm font-medium text-neutral-600 mb-1">
+              Data Type
+            </label>
+            <select
+              id="data-type"
+              bind:value={newColumn.data_type}
+              class="w-full p-2 border border-neutral-200 rounded-md focus:ring-2 focus:ring-action-primary focus:border-action-primary"
+            >
+              <option value="text">Text</option>
+              <option value="number">Number</option>
+              <option value="integer">Integer</option>
+              <option value="float">Float</option>
+              <option value="date">Date</option>
+              <option value="boolean">Boolean</option>
+              <option value="select">Select/Dropdown</option>
+            </select>
+          </div>
+          
+          <div class="flex items-center">
+            <input
+              id="is-required"
+              type="checkbox"
+              bind:checked={newColumn.is_required}
+              class="mr-2 rounded border-neutral-200 text-action-primary focus:ring-action-primary"
+            />
+            <label for="is-required" class="text-sm font-medium text-neutral-600">
+              Required field
+            </label>
+          </div>
+        </div>
+        
+        <div class="flex gap-3 mt-6 pt-4 border-t">
+          <button
+            on:click={() => showColumnDialog = false}
+            class="flex-1 px-4 py-2 text-neutral-600 bg-neutral-100 rounded-md hover:bg-neutral-200 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            on:click={saveColumn}
+            class="flex-1 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
+          >
+            {columnDialogMode === 'add' ? 'Add Column' : 'Save Changes'}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 {/if}

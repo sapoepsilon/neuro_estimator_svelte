@@ -11,11 +11,11 @@
   
   // Roadmap data for both toggle view and Gantt chart
   const roadmapData = [
-    { id: 'phase1', title: 'Phase 1: AI-Enhanced Estimate Sheets', status: 'in-progress', progress: 90, startDate: '2025-04', endDate: '2025-05', description: 'Instantly generate highly accurate sheets with AI-powered data entry and intelligent suggestions.' },
-    { id: 'phase2', title: 'Phase 2: Iterative Estimation & File Support', status: 'upcoming', progress: 0, startDate: '2025-05', endDate: '2025-06', description: 'Seamlessly upload and iterate on existing estimate files with automatic version control.' },
-    { id: 'phase3', title: 'Phase 3: Document Knowledge Base', status: 'planned', progress: 0, startDate: '2025-06', endDate: '2025-06', description: 'Search and extract insights from your uploaded documents with our AI-powered knowledge base system.' },
-    { id: 'phase4', title: 'Phase 4: Tooling & Integrations', status: 'planned', progress: 0, startDate: '2025-06', endDate: '2025-07', description: 'Integrate with popular tools and services to streamline your workflow.' },
-    { id: 'phase5', title: 'Phase 5: VLM-Powered Takeoffs', status: 'planned', progress: 0, startDate: '2025-07', endDate: '2025-08', description: 'Automatically generate detailed quantity takeoffs directly from digital floor plans and PDFs.' }
+    { id: 'phase1', title: 'Phase 1: AI-Enhanced Estimate Sheets', status: 'completed', progress: 100, startDate: '2025-04', endDate: '2025-05', description: 'Instantly generate highly accurate sheets with AI-powered data entry and intelligent suggestions.' },
+    { id: 'phase2', title: 'Phase 2: Iterative Estimation & File Support', status: 'in-progress', progress: 75, startDate: '2025-05', endDate: '2025-06', description: 'Seamlessly upload and iterate on existing estimate files with automatic version control.' },
+    { id: 'phase3', title: 'Phase 3: MCP Tool Integration', status: 'in-progress', progress: 60, startDate: '2025-06', endDate: '2025-07', description: 'Integrate with Model Context Protocol (MCP) tools for enhanced AI capabilities including web search, file operations, and external service connections.' },
+    { id: 'phase4', title: 'Phase 4: Document Knowledge Base', status: 'upcoming', progress: 0, startDate: '2025-07', endDate: '2025-08', description: 'Search and extract insights from your uploaded documents with our AI-powered knowledge base system.' },
+    { id: 'phase5', title: 'Phase 5: VLM-Powered Takeoffs', status: 'planned', progress: 0, startDate: '2025-08', endDate: '2025-09', description: 'Automatically generate detailed quantity takeoffs directly from digital floor plans and PDFs.' }
   ];
 
   onMount(() => {
@@ -43,6 +43,7 @@
 
   function getStatusColor(status: string) {
     switch(status) {
+      case 'completed': return 'bg-green-600';
       case 'in-progress': return 'bg-green-500';
       case 'upcoming': return 'bg-blue-400';
       case 'planned': return 'bg-gray-300';
@@ -52,26 +53,54 @@
 
   function getStatusText(status: string) {
     switch(status) {
+      case 'completed': return 'Completed';
       case 'in-progress': return 'In Progress';
       case 'upcoming': return 'Coming Soon';
       case 'planned': return 'Planned';
       default: return 'Planned';
     }
   }
+
+  function getCurrentTimelinePosition() {
+    const today = new Date();
+    const startDate = new Date('2025-04-01'); // April 1, 2025
+    const endDate = new Date('2025-08-30');   // August 30, 2025
+    
+    // If before start date, position at 0%
+    if (today < startDate) return 0;
+    // If after end date, position at 100%
+    if (today > endDate) return 100;
+    
+    // Calculate percentage between start and end dates
+    const totalDuration = endDate.getTime() - startDate.getTime();
+    const currentProgress = today.getTime() - startDate.getTime();
+    const percentage = (currentProgress / totalDuration) * 100;
+    
+    return Math.round(percentage);
+  }
+
+  function getCurrentDateDisplay() {
+    const today = new Date();
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                       'July', 'August', 'September', 'October', 'November', 'December'];
+    const month = monthNames[today.getMonth()];
+    const year = today.getFullYear();
+    return `Currently: ${month} ${year}`;
+  }
 </script>
 
 <Dialog.Root bind:open on:openChange={handleOpenChange}>
   <Dialog.Portal>
     <Dialog.Overlay class="fixed inset-0 bg-black/50 z-50" />
-    <Dialog.Content class="fixed left-[50%] top-[50%] z-50 max-h-[85vh] w-[90vw] max-w-[750px] translate-x-[-50%] translate-y-[-50%] rounded-lg bg-white p-6 shadow-xl border border-gray-100">
+    <Dialog.Content class="fixed left-[50%] top-[50%] z-50 max-h-[90vh] w-[95vw] max-w-[750px] translate-x-[-50%] translate-y-[-50%] rounded-lg bg-white p-4 sm:p-6 shadow-xl border border-gray-100">
       <Dialog.Header>
-        <Dialog.Title class="text-2xl font-bold text-center text-primary">Welcome to Estimating Agent</Dialog.Title>
-        <Dialog.Description class="text-center text-gray-600 mt-2 text-base">
+        <Dialog.Title class="text-xl sm:text-2xl font-bold text-center text-primary">Welcome to Estimating Agent</Dialog.Title>
+        <Dialog.Description class="text-center text-gray-600 mt-1 sm:mt-2 text-sm sm:text-base">
           AI-Powered Construction Estimation
         </Dialog.Description>
       </Dialog.Header>
 
-      <div class="mt-5 overflow-y-auto max-h-[calc(85vh-120px)]" bind:this={contentRef}>
+      <div class="mt-3 sm:mt-5 overflow-y-auto max-h-[calc(90vh-160px)]" bind:this={contentRef}>
         <div class="bg-amber-50 border border-amber-200 rounded-md p-3 mb-4 shadow-sm">
           <h3 class="font-semibold text-amber-800 text-sm">Alpha Release</h3>
           <p class="text-amber-700 text-sm mt-1">
@@ -81,7 +110,15 @@
 
         <!-- Gantt Chart Visualization -->
         <div class="mb-5">
-          <h3 class="text-base font-semibold mb-3">Development Timeline</h3>
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-base font-semibold">Development Timeline</h3>
+            <div class="flex items-center bg-blue-50 border border-blue-200 rounded-md px-3 py-1">
+              <svg class="w-4 h-4 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span class="text-sm font-medium text-blue-800">{getCurrentDateDisplay()}</span>
+            </div>
+          </div>
           <div class="relative h-14 bg-gray-100 rounded-md w-full overflow-hidden shadow-inner">
             {#each roadmapData as phase, i}
               <div 
@@ -93,10 +130,10 @@
               </div>
             {/each}
             <!-- Current time marker -->
-            <div class="absolute h-full w-1 bg-red-500 left-[18%] z-10 shadow-md"></div>
+            <div class="absolute h-full w-1 bg-red-500 z-10 shadow-md" style="left: {getCurrentTimelinePosition()}%"></div>
           </div>
           <div class="flex justify-between text-xs text-gray-600 mt-2 font-medium">
-            <span>May 2025</span>
+            <span>Apr 2025</span>
             <span>May 2025</span>
             <span>Jun 2025</span>
             <span>Jul 2025</span>
@@ -144,13 +181,14 @@
                     <p class="text-sm text-gray-700">{phase.description}</p>
                     {#if phase.id === 'phase3'}
                       <ul class="list-disc ml-6 mt-2 text-gray-700 text-sm space-y-1">
-                        <li>Automatic document indexing and semantic search</li>
-                        <li>Extract key information from construction documents</li>
+                        <li>Web search integration for real-time pricing data</li>
+                        <li>File system operations for document management</li>
+                        <li>External service connections via MCP protocol</li>
                       </ul>
                     {:else if phase.id === 'phase4'}
                       <ul class="list-disc ml-6 mt-2 text-gray-700 text-sm space-y-1">
-                        <li>Google search integration for faster research</li>
-                        <li>Price tracking and alerts for materials and labor</li>
+                        <li>Automatic document indexing and semantic search</li>
+                        <li>Extract key information from construction documents</li>
                       </ul>
                     {/if}
                   </div>
@@ -161,8 +199,8 @@
         </div>
       </div>
 
-      <Dialog.Footer class="mt-5 flex justify-end">
-        <Dialog.Close class="px-5 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-all hover:shadow-md text-base font-medium">
+      <Dialog.Footer class="mt-3 sm:mt-5 flex justify-end">
+        <Dialog.Close class="px-4 sm:px-5 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-all hover:shadow-md text-sm sm:text-base font-medium">
           Got it
         </Dialog.Close>
       </Dialog.Footer>

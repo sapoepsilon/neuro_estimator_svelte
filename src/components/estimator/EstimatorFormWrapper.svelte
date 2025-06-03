@@ -10,6 +10,7 @@
   let loading = true;
   let project = null;
   let estimateItems = [];
+  let projectColumns = [];
   let error = null;
   
   function parseUrlParams() {
@@ -45,15 +46,51 @@
   async function fetchEstimateItems() {
     if (!projectId || !$user) return;
     
+    console.log(`Fetching estimate items for project ID: ${projectId}`);
+    
     try {
-      const { data, error } = await supabase
-        .rpc('get_project_estimate_items', { project_id_param: projectId })
+      // First fetch columns for this project
+      const { data: columns, error: columnsError } = await supabase
+        .from('estimate_columns')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('position');
       
-      if (error) throw error;
+      if (columnsError) throw columnsError;
       
-      estimateItems = data || [];
+      // Then fetch all estimate items
+      const { data: items, error: itemsError } = await supabase
+        .from('estimate_items')
+        .select('*')
+        .eq('project_id', projectId);
+      
+      if (itemsError) throw itemsError;
+      
+      // Group items by row_number
+      const groupedItems = {};
+      items.forEach(item => {
+        if (!groupedItems[item.row_number]) {
+          groupedItems[item.row_number] = {
+            row_number: item.row_number,
+            id: `row-${item.row_number}` // Create a unique id for the row
+          };
+        }
+        
+        // Find the column name for this item
+        const column = columns.find(col => col.id === item.column_id);
+        if (column) {
+          groupedItems[item.row_number][column.column_name] = item.value;
+        }
+      });
+      
+      // Convert to array
+      estimateItems = Object.values(groupedItems);
+      projectColumns = columns;
+      
+      console.log(`Estimate items fetched:`, estimateItems);
       return true;
     } catch (err) {
+      console.error('Error fetching estimate items:', err);
       estimateItems = [];
       error = 'Failed to load estimate items';
       return false;
@@ -63,29 +100,16 @@
   function formatEstimateItemsForDisplay() {
     if (!estimateItems.length) return null;
     
+    // Calculate total amount from the amount column values
     const totalAmount = estimateItems.reduce((sum, item) => {
       return sum + (Number(item.amount) || 0);
     }, 0);
-    const mainItems = estimateItems.filter(item => !item.is_sub_item);
-    const subItems = estimateItems.filter(item => item.is_sub_item);
-    const lineItems = mainItems.map(item => {
-    const itemSubItems = subItems.filter(subItem => subItem.parent_item_id === item.id);
-      
+    
+    // Since we don't have sub-items in the new structure, all items are main items
+    const lineItems = estimateItems.map(item => {
       return {
-        id: item.id,
-        description: item.title,
-        quantity: item.quantity,
-        unitType: item.unit_type,
-        unitPrice: item.unit_price,
-        amount: item.amount,
-        subItems: itemSubItems.map(subItem => ({
-          id: subItem.id,
-          description: subItem.title,
-          quantity: subItem.quantity,
-          unitType: subItem.unit_type,
-          unitPrice: subItem.unit_price,
-          amount: subItem.amount
-        }))
+        ...item, // This includes row_number and all column values
+        subItems: [] // No sub-items in the new structure
       };
     });
     
@@ -94,7 +118,9 @@
         title: project?.name || 'Project Estimate',
         currency: estimateItems[0]?.currency || 'USD',
         totalAmount: totalAmount,
-        lineItems: lineItems
+        lineItems: lineItems,
+        projectColumns: projectColumns,
+        project: project
       }
     };
   }
@@ -106,9 +132,10 @@
     error = null;
     
     try {
+      const projectSuccess = await fetchProject();
       const itemsSuccess = await fetchEstimateItems();
       
-      if (!itemsSuccess) {
+      if (!projectSuccess || !itemsSuccess) {
         error = 'Failed to load project data';
       }
     } catch (err) {
@@ -129,7 +156,10 @@
       if ($user) {
         estimateItems = [];
         project = null;
-        loadData();
+        loadData().then(() => {
+          // Open AI sidebar after data is loaded
+          openAiSidebar();
+        });
       }
     }
   }
@@ -146,22 +176,38 @@
     }));
   }
   
+  function openAiSidebar() {
+    isAiSidebarVisible = true;
+    window.dispatchEvent(new CustomEvent('openAiSidebar', { 
+      detail: { 
+        projectId: projectId,
+        projectName: project?.name || 'Project'
+      }
+    }));
+  }
+  
   onMount(() => {
     const handleSidebarClose = () => {
       isAiSidebarVisible = false;
     };
     
+    const handleSidebarOpen = () => {
+      isAiSidebarVisible = true;
+    };
+    
     window.addEventListener('aiSidebarClosed', handleSidebarClose);
+    window.addEventListener('aiSidebarOpened', handleSidebarOpen);
     
     return () => {
       window.removeEventListener('aiSidebarClosed', handleSidebarClose);
+      window.removeEventListener('aiSidebarOpened', handleSidebarOpen);
     };
   });
   
   function handleKeydown(event) {
     if (event.ctrlKey && event.key === 'k') {
       event.preventDefault();
-      toggleAiSidebar();
+      openAiSidebar();
     }
   }
   
@@ -236,7 +282,7 @@
     <div class="bg-red-50 text-red-700 p-4 rounded-md mb-4">
       <p>{error}</p>
     </div>
-  {:else if projectId && estimateItems.length > 0}
+  {:else if projectId && estimateItems.length > 0 && $user}
     <div class="relative">
       <EstimateDisplay 
         bind:this={estimateDisplayComponent}
@@ -246,10 +292,11 @@
         on:itemDeleted={handleItemDeleted}
       />
       
-      <!-- AI Sidebar Toggle Button - Always rendered but conditionally visible -->
+      <!-- AI Sidebar Toggle Button - Conditionally rendered -->
+      {#if !isAiSidebarVisible}
       <div 
-        class="fixed bottom-6 right-6 flex flex-col items-end space-y-2 z-[999] transition-opacity duration-300" 
-        style="pointer-events: auto; {isAiSidebarVisible ? 'opacity: 0; visibility: hidden;' : 'opacity: 1; visibility: visible;'}"
+        class="fixed bottom-6 right-6 flex flex-col items-end space-y-2 z-[999]" 
+        style="pointer-events: auto;"
       >
         <div class="hidden md:block bg-white dark:bg-gray-800 text-xs text-gray-500 dark:text-gray-400 p-2 rounded-md shadow-md flex items-center mb-2">
           <Keyboard class="h-3 w-3 mr-1" />
@@ -257,29 +304,32 @@
         </div>
         <button
           class="bg-primary text-white p-3 rounded-full shadow-lg hover:bg-primary/90 transition-colors z-[100] cursor-pointer"
-          on:click={toggleAiSidebar}
-          aria-label="Toggle AI Estimator"
+          on:click={openAiSidebar}
+          aria-label="Open AI Estimator"
+          data-testid="ai-sidebar-open-button"
           style="pointer-events: auto;"
         >
           <MessageSquare class="h-6 w-6" />
         </button>
       </div>
+      {/if}
     </div>
   {:else}
     <div class="relative">
       <EstimatorForm projectId={projectId} projectData={project} />
       
-      {#if projectId}
+      {#if projectId && $user}
         {#if !isAiSidebarVisible}
         <div class="fixed bottom-6 right-6 flex flex-col items-end space-y-2 z-[999]" style="pointer-events: auto;">
-          <div class="bg-white dark:bg-gray-800 text-xs text-gray-500 dark:text-gray-400 p-2 rounded-md shadow-md flex items-center mb-2">
+          <div class="hidden md:block bg-white dark:bg-gray-800 text-xs text-gray-500 dark:text-gray-400 p-2 rounded-md shadow-md flex items-center mb-2">
             <Keyboard class="h-3 w-3 mr-1" />
             <span>Ctrl+K</span>
           </div>
           <button
             class="bg-primary text-white p-3 rounded-full shadow-lg hover:bg-primary/90 transition-colors z-[100] cursor-pointer"
-            on:click={toggleAiSidebar}
-            aria-label="Toggle AI Estimator"
+            on:click={openAiSidebar}
+            aria-label="Open AI Estimator"
+            data-testid="ai-sidebar-open-button"
             style="pointer-events: auto;"
           >
             <MessageSquare class="h-6 w-6" />

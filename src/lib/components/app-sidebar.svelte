@@ -5,36 +5,31 @@
   import { supabase } from "$lib/supabase";
 
   
-  // Sidebar state
   let collapsed = false;
   let isMobile = false;
   export let sidebarVisible = false;
   
-  // Get saved width from localStorage or use default
   const STORAGE_KEY = 'neuro-estimator-sidebar-width';
-  let widthPx = collapsed ? 64 : 250;
+  const COLLAPSED_STORAGE_KEY = 'neuro-estimator-sidebar-collapsed';
   
-  // Function to check if we're in a browser environment
+  // Initialize widthPx with a default value
+  let widthPx = 250;
+  
   const isBrowser = () => typeof window !== 'undefined';
   
-  // Initialize width from localStorage if available
   let initialWidthLoaded = false;
   
-  let width = `${widthPx}px`;
+  // Width will be reactive to widthPx changes
+  $: width = `${widthPx}px`;
   
-  // Resize state
   let isResizing = false;
-  let minWidth = 180; // Minimum width in pixels
-  let maxWidth = 500; // Maximum width in pixels
+  let minWidth = 180; 
+  let maxWidth = 500; 
   let startX: number;
   let startWidth: number;
   
-
-  
-  // Props
   export let openLoginDialog = () => {};
   
-  // Projects data from database
   let projects = [];
 
   const getProjects = async () => {
@@ -43,7 +38,6 @@
     }
     
     try {
-      // Use a direct SQL query with rpc to bypass RLS policies
       const { data, error } = await supabase.rpc('get_user_projects', {
         user_id_param: $user.id
       });
@@ -60,9 +54,7 @@
     }
   }
   
-  // Move project fetching to onMount to ensure auth is initialized
   onMount(() => {
-    // Subscribe to user store changes
     const unsubscribe = user.subscribe(async currentUser => {
       if (currentUser) {
         projects = await getProjects();
@@ -76,9 +68,7 @@
     };
   })
   
-  // Watch for sidebar visibility changes to ensure projects are loaded when sidebar opens
   $: if (sidebarVisible && $user) {
-    // Use a small timeout to ensure this runs after the sidebar animation starts
     setTimeout(async () => {
       if (projects.length === 0) {
         projects = await getProjects();
@@ -86,7 +76,6 @@
     }, 50);
   }
   
-  // Navigation items
   const navItems = [
     {
       title: "Home",
@@ -104,7 +93,21 @@
         sidebarVisible = false;
       }
     } else if (wasMobile && !isMobile) {
+      // Transitioning from mobile to desktop
       sidebarVisible = true;
+      // Restore the saved desktop width
+      const savedWidth = localStorage.getItem(STORAGE_KEY);
+      const savedCollapsed = localStorage.getItem(COLLAPSED_STORAGE_KEY);
+      
+      if (savedCollapsed === 'true') {
+        collapsed = true;
+        widthPx = 64;
+      } else if (savedWidth) {
+        widthPx = parseInt(savedWidth, 10);
+      } else {
+        widthPx = 250; // Default desktop width
+      }
+      width = `${widthPx}px`;
     }
   }
   
@@ -132,10 +135,18 @@
       collapsed = !collapsed;
       widthPx = collapsed ? 64 : 250;
       width = `${widthPx}px`;
+      
+      // Save collapsed state to localStorage
+      if (isBrowser()) {
+        try {
+          localStorage.setItem(COLLAPSED_STORAGE_KEY, collapsed.toString());
+        } catch (e) {
+          console.error('Failed to save sidebar collapsed state to localStorage:', e);
+        }
+      }
     }
   }
   
-  // Resize handlers
   function startResize(event: MouseEvent) {
     if (collapsed || isMobile) return;
     
@@ -143,39 +154,28 @@
     startX = event.clientX;
     startWidth = widthPx;
     
-    // Add event listeners for resize
     window.addEventListener('mousemove', handleResize, { passive: true });
     window.addEventListener('mouseup', stopResize);
     
-    // Prevent text selection during resize
     document.body.style.userSelect = 'none';
-    
-    // Disable pointer events on other elements to improve performance
     document.body.style.pointerEvents = 'none';
   }
   
-  // Use requestAnimationFrame for smoother updates
   let animationFrameId: number | null = null;
   
   function handleResize(event: MouseEvent) {
     if (!isResizing) return;
     
-    // Cancel any pending animation frame
     if (animationFrameId !== null) {
       cancelAnimationFrame(animationFrameId);
     }
     
-    // Schedule the update on the next animation frame
     animationFrameId = requestAnimationFrame(() => {
       const diffX = event.clientX - startX;
       let newWidth = startWidth + diffX;
-      
-      // Enforce min and max width
       newWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
-      
       widthPx = newWidth;
       width = `${widthPx}px`;
-      
       animationFrameId = null;
     });
   }
@@ -183,22 +183,18 @@
   function stopResize() {
     isResizing = false;
     
-    // Cancel any pending animation frame
     if (animationFrameId !== null) {
       cancelAnimationFrame(animationFrameId);
       animationFrameId = null;
     }
     
-    // Remove event listeners
     window.removeEventListener('mousemove', handleResize);
     window.removeEventListener('mouseup', stopResize);
-    
-    // Restore text selection and pointer events
     document.body.style.userSelect = '';
     document.body.style.pointerEvents = '';
     
-    // Save width to localStorage
-    if (isBrowser() && !collapsed) {
+    // Save the new width to localStorage
+    if (isBrowser()) {
       try {
         localStorage.setItem(STORAGE_KEY, widthPx.toString());
       } catch (e) {
@@ -207,9 +203,9 @@
     }
   }
   
-  // Hide sidebar when clicking on a link (mobile only)
-  function handleLinkClick(event) {
-    const href = event.currentTarget.getAttribute('href');
+  function handleLinkClick(event: MouseEvent) {
+    const target = event.currentTarget as HTMLAnchorElement;
+    const href = target.getAttribute('href');
     if (isMobile) {
       sidebarVisible = false;
     }
@@ -224,15 +220,11 @@
     }
   }
   
-
-  
-  // Set up event listeners
   onMount(() => {
     checkMobile();
     window.addEventListener('resize', checkMobile);
     
-    // Add escape key listener for closing sidebar on mobile
-    const handleEscKey = (e) => {
+    const handleEscKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isMobile && sidebarVisible) {
         sidebarVisible = false;
         document.body.style.overflow = '';
@@ -241,21 +233,19 @@
     
     window.addEventListener('keydown', handleEscKey);
     
-    // Add swipe detection for mobile
     let touchStartX = 0;
     let touchEndX = 0;
     
-    const handleTouchStart = (e) => {
+    const handleTouchStart = (e: TouchEvent) => {
       touchStartX = e.changedTouches[0].screenX;
     };
     
-    const handleTouchEnd = (e) => {
+    const handleTouchEnd = (e: TouchEvent) => {
       touchEndX = e.changedTouches[0].screenX;
       handleSwipe();
     };
     
     const handleSwipe = () => {
-      // Detect left swipe to close sidebar
       if (isMobile && sidebarVisible && touchEndX < touchStartX - 50) {
         sidebarVisible = false;
         document.body.style.overflow = '';
@@ -267,17 +257,25 @@
       document.addEventListener('touchend', handleTouchEnd, { passive: true });
     }
     
-    // Load saved width from localStorage on mount
     if (isBrowser() && !initialWidthLoaded) {
       try {
+        const savedCollapsed = localStorage.getItem(COLLAPSED_STORAGE_KEY);
+        if (savedCollapsed !== null) {
+          collapsed = savedCollapsed === 'true';
+        }
+        
         const savedWidth = localStorage.getItem(STORAGE_KEY);
         if (savedWidth && !collapsed) {
           widthPx = parseInt(savedWidth, 10);
           width = `${widthPx}px`;
+        } else if (collapsed) {
+          widthPx = 64;
+          width = '64px';
         }
+        
         initialWidthLoaded = true;
       } catch (e) {
-        console.error('Failed to load sidebar width from localStorage:', e);
+        console.error('Failed to load sidebar state from localStorage:', e);
       }
     }
     
@@ -290,25 +288,39 @@
         document.removeEventListener('touchend', handleTouchEnd);
       }
       
-      // Clean up resize listeners if component is destroyed while resizing
       window.removeEventListener('mousemove', handleResize);
       window.removeEventListener('mouseup', stopResize);
       
-      // Cancel any pending animation frame
       if (animationFrameId !== null) {
         cancelAnimationFrame(animationFrameId);
       }
       
-      // Restore body overflow
       document.body.style.overflow = '';
     };
   });
 </script>
 
-<!-- Mobile overlay to close sidebar when clicking outside -->
+<style>
+  /* Ensure smooth hardware-accelerated transitions on mobile */
+  @media (max-width: 768px) {
+    div[style*="transform"] {
+      will-change: transform;
+      -webkit-transform: translateZ(0);
+      transform: translateZ(0);
+      -webkit-backface-visibility: hidden;
+      backface-visibility: hidden;
+    }
+  }
+  
+  /* Prevent partial visibility states */
+  .pointer-events-none {
+    pointer-events: none;
+  }
+</style>
+
 {#if isMobile && sidebarVisible}
   <div 
-    class="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 transition-opacity duration-300 ease-in-out"
+    class="fixed inset-0 bg-black/40 backdrop-blur-sm z-99 transition-opacity duration-300 ease-in-out"
     on:click={() => sidebarVisible = false}
     on:keydown={(e) => e.key === 'Escape' && (sidebarVisible = false)}
     role="button"
@@ -318,11 +330,11 @@
 {/if}
 
 <div 
-  class="h-full flex flex-col border-r bg-background shadow-lg {isResizing ? '' : 'transition-all duration-300 ease-in-out'} {isMobile ? 'fixed z-50 top-0 bottom-0 max-h-screen overflow-hidden' : 'relative'}"
-  style="{isMobile ? `width: 280px; transform: translateX(${sidebarVisible ? '0' : '-100%'})` : `width: ${width}; min-width: ${width}; max-width: ${width};`}"
+  class="h-full flex flex-col border-r bg-background shadow-lg {isResizing ? '' : 'transition-all duration-300 ease-in-out'} {isMobile ? 'fixed z-[1200] top-0 bottom-0 max-h-screen overflow-hidden' : 'relative'}"
+  style="{isMobile ? `width: 280px; transform: translateX(${sidebarVisible ? '0' : '-100%'}); left: 0;` : `width: ${width}; min-width: ${width}; max-width: ${width};`}"
+  class:pointer-events-none={isMobile && !sidebarVisible}
 >
   
-  <!-- Full-height resize handle (only visible when not collapsed and not on mobile) -->
   {#if !collapsed && !isMobile}
     <button 
       class="absolute right-0 top-0 bottom-0 w-0.1 cursor-ew-resize hover:bg-primary/20 active:bg-primary/40 z-20 border-0 p-0 m-0 bg-transparent flex items-center justify-center transition-colors duration-150 {isResizing ? 'bg-primary/30' : ''}"
@@ -335,8 +347,6 @@
     </button>
   {/if}
 
-    <!-- Regular Sidebar Mode -->
-    <!-- Header -->
     <div class="p-4 border-b flex items-center justify-between relative">
       {#if !collapsed}
         <h2 class="text-lg font-semibold">Estimating Agent</h2>
@@ -355,9 +365,7 @@
 
     </div>
     
-    <!-- Content -->
     <div class="flex-1 overflow-auto py-2">
-    <!-- Navigation Section -->
     <div class="px-3 py-2">
       {#if !collapsed || isMobile}
         <h3 class="mb-2 px-2 text-xs font-semibold text-slate-500">Navigation</h3>
@@ -382,7 +390,6 @@
       </nav>
     </div>
     
-    <!-- Projects Section -->
     <div class="mt-6 px-3 py-2">
       <div class="flex items-center justify-between mb-2 px-2">
         {#if !collapsed || isMobile}
@@ -449,6 +456,7 @@
           <button 
             class="w-full py-2 px-4 border border-gray-300 rounded-md flex items-center justify-center text-sm hover:bg-gray-100" 
             on:click={() => { openLoginDialog(); sidebarVisible = false; }}
+            data-testid="sidebar-login-button"
           >
             <LogIn class="h-4 w-4 mr-2" />
             Login / Sign Up

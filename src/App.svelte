@@ -86,7 +86,25 @@
     if (showAiSidebar) {
       aiSidebarProjectId = projectId;
       aiSidebarProjectName = projectName;
+      // Dispatch event to notify that sidebar is opened
+      window.dispatchEvent(new CustomEvent('aiSidebarOpened'));
     }
+  }
+  
+  // Function to handle AI sidebar open (always opens, doesn't toggle)
+  function handleOpenAiSidebar(event) {
+    const { projectId, projectName } = event.detail;
+    
+    // Only update if the sidebar is not already open
+    if (!showAiSidebar) {
+      showAiSidebar = true;
+      // Dispatch event to notify that sidebar is opened
+      window.dispatchEvent(new CustomEvent('aiSidebarOpened'));
+    }
+    
+    // Always update project details (in case they changed)
+    aiSidebarProjectId = projectId;
+    aiSidebarProjectName = projectName;
   }
   
   // Function to explicitly hide the AI sidebar
@@ -112,22 +130,26 @@
     // Listen for AI sidebar toggle events
     window.addEventListener('toggleAiSidebar', handleToggleAiSidebar);
     
+    // Listen for AI sidebar open events
+    window.addEventListener('openAiSidebar', handleOpenAiSidebar);
+    
     // Listen for hide AI sidebar events
     window.addEventListener('hideAiSidebar', handleHideAiSidebar);
     
     return () => {
       window.removeEventListener('projectSelected', handleProjectSelected);
       window.removeEventListener('toggleAiSidebar', handleToggleAiSidebar);
+      window.removeEventListener('openAiSidebar', handleOpenAiSidebar);
       window.removeEventListener('hideAiSidebar', handleHideAiSidebar);
     };
   });
 </script>
 
 
-  <div class="flex h-screen w-full overflow-hidden">
+  <div class="flex h-dvh w-full overflow-hidden">
     <AppSidebar bind:sidebarVisible={showMobileSidebar} {openLoginDialog} />
     <div class="flex-1 flex flex-col overflow-hidden relative">
-      <div class="flex items-center">
+      <div class="flex items-center relative z-50">
         <button 
           class="md:hidden p-2 m-2 rounded-md hover:bg-slate-100" 
           on:click={toggleMobileSidebar}
@@ -137,16 +159,18 @@
         </button>
         <Navbar openLoginDialog={openLoginDialog} />
       </div>
-      <main class="flex-1">
-        <Router {routes} />
-      </main>
+      <div class="flex-1 flex overflow-hidden border">
+        <main class="flex-1 overflow-auto bg-transparent opacity-1">
+          <Router {routes} />
+        </main>
+        <AiSidebar 
+          bind:open={showAiSidebar} 
+          bind:projectId={aiSidebarProjectId} 
+          bind:projectName={aiSidebarProjectName} 
+          bind:this={aiSidebarComponent}
+        />
+      </div>
     </div>
-    <AiSidebar 
-      bind:open={showAiSidebar} 
-      bind:projectId={aiSidebarProjectId} 
-      bind:projectName={aiSidebarProjectName} 
-      bind:this={aiSidebarComponent}
-    />
   </div>
 
 
